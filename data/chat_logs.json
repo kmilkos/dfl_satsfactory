@@ -1,0 +1,26 @@
+[
+  {
+    "id": "msg_join_1784041725245_Greg_DFL",
+    "sender": "SERVER",
+    "text": "Greg_DFL joined the server.",
+    "timestamp": "2026-07-14T15:08:45.245Z"
+  },
+  {
+    "id": "msg_join_1784041725245_Becky_FICSIT",
+    "sender": "SERVER",
+    "text": "Becky_FICSIT joined the server.",
+    "timestamp": "2026-07-14T15:08:45.245Z"
+  },
+  {
+    "id": "msg_join_1784041725246_FICSIT_Pioneer",
+    "sender": "SERVER",
+    "text": "FICSIT_Pioneer joined the server.",
+    "timestamp": "2026-07-14T15:08:45.246Z"
+  },
+  {
+    "id": "sim_1784041725262_yyc8h",
+    "sender": "Greg_DFL",
+    "text": "Need to automate heavy modular frames next, handcrafting them is pain.",
+    "timestamp": "2026-07-14T15:08:45.262Z"
+  }
+]

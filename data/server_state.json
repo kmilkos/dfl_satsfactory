@@ -1,8 +1,8 @@
 {
   "status": "ONLINE",
   "version": "1.0.0.12 (SML v3.8.0-Build2)",
-  "uptime": 18579,
-  "playersOnline": 2,
+  "uptime": 23729,
+  "playersOnline": 3,
   "maxPlayers": 8,
   "sessionName": "DaemonForge_Main_World",
   "autoBackupEnabled": true,

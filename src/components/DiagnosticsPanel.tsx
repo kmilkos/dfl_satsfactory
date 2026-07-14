@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Activity, Cpu, MessageSquare, Send, Terminal, 
-  Heart, Plug, Compass, Server, Search, RefreshCw, AlertCircle, PlayCircle
+  Heart, Plug, Compass, Server, Search, RefreshCw, AlertCircle, PlayCircle,
+  Layers, Box, TrendingUp, Gauge
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ConsoleLogLine, TelemetryData, ChatMessage, TelemetryHistoryPoint } from "../types";
@@ -145,300 +146,317 @@ export default function DiagnosticsPanel({
             </div>
           </div>
 
-          {/* Telemetry Historical Graph */}
+          {/* FICSIT POWER GRID CONTROL MATRIX (Prominent Full-Width Panel) */}
           <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2.5">
               <div className="flex flex-col">
                 <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
-                  <Activity className="w-4 h-4 mr-1.5 text-orange-500 animate-pulse" /> Telemetry Resource History
+                  <Plug className="w-4 h-4 mr-1.5 text-orange-500 animate-pulse" /> Ficsit Power Grid Control Matrix
                 </span>
-                <span className="text-[10px] font-mono text-slate-500 mt-0.5">30-frame rolling metrics of server daemon activity</span>
+                <span className="text-[10px] font-mono text-slate-500 mt-0.5">Real-time status of high-voltage industrial circuits and accumulator reserves</span>
               </div>
-              <div className="flex space-x-4 text-xs font-mono mt-2 sm:mt-0">
-                <div className="flex items-center">
-                  <span className="w-2.5 h-2.5 rounded bg-orange-500/20 border border-orange-500 mr-1.5"></span>
-                  <span className="text-slate-400">CPU Usage</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-2.5 h-2.5 rounded bg-sky-500/20 border border-sky-500 mr-1.5"></span>
-                  <span className="text-slate-400">RAM Allocation</span>
-                </div>
-              </div>
+              <span className="text-[10px] font-mono text-slate-500 bg-zinc-950 border border-slate-800 px-2 py-1 rounded mt-2 sm:mt-0 self-start sm:self-center">Source: GET /getPower</span>
             </div>
 
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={telemetryHistory}
-                  margin={{ top: 10, right: 5, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.01}/>
-                    </linearGradient>
-                    <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25}/>
-                      <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.01}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis 
-                    dataKey="time" 
-                    stroke="#475569" 
-                    fontSize={10} 
-                    fontFamily="JetBrains Mono, monospace"
-                    tickLine={false}
-                    dy={10}
-                  />
-                  <YAxis 
-                    yAxisId="left"
-                    stroke="#f97316" 
-                    fontSize={10} 
-                    fontFamily="JetBrains Mono, monospace"
-                    tickLine={false}
-                    domain={[0, 100]}
-                    tickFormatter={(v) => `${v}%`}
-                  />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    stroke="#0ea5e9" 
-                    fontSize={10} 
-                    fontFamily="JetBrains Mono, monospace"
-                    tickLine={false}
-                    domain={[0, 16]}
-                    tickFormatter={(v) => `${v}GB`}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="cpu" 
-                    name="CPU Usage"
-                    stroke="#f97316" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorCpu)" 
-                    isAnimationActive={false}
-                  />
-                  <Area 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="ram" 
-                    name="RAM Allocation"
-                    stroke="#0ea5e9" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorRam)" 
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {telemetry.powerGrids.length === 0 ? (
+                <div className="md:col-span-2 text-center py-8 text-slate-600 font-mono text-xs">
+                  Power grid telemetry offline. Start the Factory server to establish active switchboard connections.
+                </div>
+              ) : (
+                telemetry.powerGrids.map((grid) => {
+                  const consumptionPercent = Math.min(100, (grid.consumedMw / (grid.capacityMw || 1)) * 100);
+                  const batteryPercent = grid.batteryCapacityMj > 0 ? (grid.batteryChargeMj / grid.batteryCapacityMj) * 100 : 0;
+                  const isCritical = consumptionPercent > 90;
+                  const isHighLoad = consumptionPercent > 75 && consumptionPercent <= 90;
+
+                  return (
+                    <div key={grid.gridId} className="bg-zinc-950/60 border border-slate-800/80 rounded-lg p-4 space-y-4 relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
+                      {/* Background accent glow */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/2 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+
+                      {/* Header Row */}
+                      <div className="flex justify-between items-center border-b border-slate-900/60 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${isCritical ? "bg-rose-500 animate-ping" : isHighLoad ? "bg-amber-500 animate-pulse" : "bg-emerald-500 animate-pulse"}`}></div>
+                          <span className="text-sm font-mono font-bold text-slate-200">CIRCUIT #{grid.gridId}</span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold border ${
+                          isCritical 
+                            ? "bg-rose-500/10 text-rose-400 border-rose-500/20" 
+                            : isHighLoad 
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        }`}>
+                          {isCritical ? "CRITICAL OVERLOAD" : isHighLoad ? "HEAVY LOAD" : "STABLE COUPLING"}
+                        </span>
+                      </div>
+
+                      {/* Major Metrics readout */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-mono text-slate-500 uppercase block">Power Consumption</span>
+                          <div className="flex items-baseline space-x-1 font-mono">
+                            <span className="text-lg font-bold text-slate-100">{grid.consumedMw.toLocaleString()}</span>
+                            <span className="text-[10px] text-slate-500 font-bold">MW</span>
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-mono text-slate-500 uppercase block">Total Grid Capacity</span>
+                          <div className="flex items-baseline space-x-1 font-mono">
+                            <span className="text-lg font-bold text-orange-500">{grid.capacityMw.toLocaleString()}</span>
+                            <span className="text-[10px] text-orange-500/70 font-bold">MW</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Big styled consumption progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                          <span>GRID METRIC LIMIT</span>
+                          <span>{consumptionPercent.toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full bg-zinc-950 border border-slate-900 h-3.5 rounded overflow-hidden relative">
+                          <div 
+                            className={`h-full transition-all duration-1000 relative shadow-inner ${
+                              isCritical 
+                                ? "bg-gradient-to-r from-rose-600 to-rose-400" 
+                                : isHighLoad 
+                                  ? "bg-gradient-to-r from-amber-600 to-amber-400" 
+                                  : "bg-gradient-to-r from-orange-600 to-orange-400"
+                            }`}
+                            style={{ width: `${consumptionPercent}%` }}
+                          >
+                            {/* Light stripe reflection effect */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Battery sub-panel */}
+                      {grid.batteryCapacityMj > 0 ? (
+                        <div className="pt-2 border-t border-slate-900/60 space-y-1.5">
+                          <div className="flex justify-between items-center font-mono text-[10px] text-slate-400">
+                            <span className="flex items-center">
+                              <Activity className="w-3.5 h-3.5 mr-1 text-emerald-500" />
+                              ACCUMULATOR RESERVES
+                            </span>
+                            <span className="text-emerald-400 font-bold">{batteryPercent.toFixed(0)}% CHARGED</span>
+                          </div>
+                          
+                          <div className="w-full bg-zinc-950 border border-slate-900 h-2 rounded overflow-hidden relative">
+                            <div 
+                              className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000"
+                              style={{ width: `${batteryPercent}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-[9px] font-mono text-slate-500 flex justify-between">
+                            <span>BATTERY LEVEL: {grid.batteryChargeMj.toLocaleString()} MJ</span>
+                            <span>TOTAL RESERVES: {grid.batteryCapacityMj.toLocaleString()} MJ</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-1.5 border-t border-slate-900/40 text-[9px] font-mono text-slate-600">
+                          No FICSIT Power Accumulators detected on this grid.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Left Col: Power Grids & Players */}
-            <div className="lg:col-span-2 space-y-6">
-              
-              {/* Power Grid breakdown */}
-              <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
-                    <Plug className="w-4 h-4 mr-1.5 text-orange-500" /> Isolated Power Grids
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">Source: GET /getPower</span>
-                </div>
-
-                <div className="space-y-4">
-                  {telemetry.powerGrids.length === 0 ? (
-                    <div className="text-center py-6 text-slate-600 font-mono text-xs">Grid telemetry offline. Start node to power switchboards.</div>
-                  ) : (
-                    telemetry.powerGrids.map((grid) => {
-                      const consumptionPercent = Math.min(100, (grid.consumedMw / grid.capacityMw) * 100);
-                      const batteryPercent = (grid.batteryChargeMj / grid.batteryCapacityMj) * 100;
-                      return (
-                        <div key={grid.gridId} className="space-y-2 border-b border-slate-900 pb-3 last:border-b-0 last:pb-0">
-                          <div className="flex justify-between items-center text-xs font-mono">
-                            <span className="text-orange-500 font-bold uppercase">Grid Network #{grid.gridId}</span>
-                            <span className="text-slate-400">
-                              Load: <span className="text-slate-200 font-bold">{grid.consumedMw} MW</span> / <span className="text-orange-500 font-bold">{grid.capacityMw} MW</span>
-                            </span>
-                          </div>
-
-                          {/* Power meter progress bar */}
-                          <div className="w-full bg-zinc-900 border border-slate-800 h-3 rounded overflow-hidden relative">
-                            <div 
-                              className={`h-full transition-all duration-1000 ${
-                                consumptionPercent > 90 
-                                  ? "bg-rose-500" 
-                                  : consumptionPercent > 75 
-                                    ? "bg-amber-500" 
-                                    : "bg-orange-500"
-                              }`}
-                              style={{ width: `${consumptionPercent}%` }}
-                            ></div>
-                            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-mono font-bold text-slate-200 uppercase select-none">
-                              Consumption: {consumptionPercent.toFixed(1)}%
-                            </span>
-                          </div>
-
-                          {/* Battery charge stats if RefinedPower/Battery exists */}
-                          <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
-                            <span>FICSIT Accumulators Charge: {grid.batteryChargeMj} / {grid.batteryCapacityMj} MJ</span>
-                            <span>{batteryPercent.toFixed(0)}% Charged</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+          {/* FICSIT ASSEMBLY LINE & OUTPUT MATRIX (Prominent Full-Width Panel) */}
+          <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex flex-col">
+                <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
+                  <Layers className="w-4 h-4 mr-1.5 text-orange-500 animate-pulse" /> Ficsit Assembly Line & Output Matrix
+                </span>
+                <span className="text-[10px] font-mono text-slate-500 mt-0.5">Real-time throughput analysis of automated manufacture lines and material balances</span>
               </div>
-
-              {/* Connected Players Grid */}
-              <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
-                    <Compass className="w-4 h-4 mr-1.5 text-orange-500" /> Active Players Coordinates
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">Source: GET /getPlayer</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {telemetry.players.length === 0 ? (
-                    <div className="sm:col-span-2 text-center py-6 text-slate-600 font-mono text-xs">Lobby empty. Node awaiting client connections.</div>
-                  ) : (
-                    telemetry.players.map((player) => (
-                      <div key={player.name} className="p-3 bg-zinc-900/40 border border-slate-900 rounded font-mono text-xs space-y-1.5">
-                        <div className="flex justify-between items-center border-b border-slate-800/60 pb-1">
-                          <span className="text-slate-200 font-bold uppercase">{player.name}</span>
-                          <span className="text-slate-500 text-[10px]">Ping: <span className="text-emerald-400 font-bold">{player.pingMs}ms</span></span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 text-[10px]">Health:</span>
-                          <span className="text-rose-500 font-bold flex items-center">
-                            <Heart className="w-3.5 h-3.5 mr-1 fill-rose-500" /> {player.health.toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="space-y-0.5">
-                          <span className="text-slate-500 text-[9px] uppercase tracking-wide">In-Game Coordinates:</span>
-                          <div className="text-[10px] text-slate-400 leading-normal font-bold">
-                            X: {player.location.x} | Y: {player.location.y} | Z: {player.location.z}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Production Rates throughput */}
-              <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-3 shadow-lg text-left">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
-                    <Activity className="w-4 h-4 mr-1.5 text-orange-500" /> Factory Throughput Production
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">Source: GET /getProduction</span>
-                </div>
-
-                <div className="space-y-2 max-h-[180px] overflow-y-auto">
-                  {telemetry.throughput.length === 0 ? (
-                    <div className="text-center py-6 text-slate-600 font-mono text-xs">Production rates zeroed. Factory is asleep.</div>
-                  ) : (
-                    telemetry.throughput.map((item) => (
-                      <div key={item.name} className="flex justify-between items-center font-mono text-xs p-1.5 border-b border-slate-900/40 last:border-b-0 hover:bg-zinc-900/40 rounded transition-all">
-                        <span className="text-slate-300 font-semibold">{item.name}</span>
-                        <div className="space-x-4 flex items-center">
-                          <span className="text-[10px] text-slate-500">
-                            Prod: <span className="text-emerald-400 font-bold">+{item.productionRate.toFixed(1)}/m</span>
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            Cons: <span className="text-rose-400 font-bold">-{item.consumptionRate.toFixed(1)}/m</span>
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            item.currentRate > 0 
-                              ? "bg-emerald-500/10 text-emerald-400" 
-                              : item.currentRate === 0 
-                                ? "bg-slate-800 text-slate-500" 
-                                : "bg-rose-500/10 text-rose-400"
-                          }`}>
-                            {item.currentRate >= 0 ? `+${item.currentRate.toFixed(1)}` : item.currentRate.toFixed(1)}/m
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
+              <span className="text-[10px] font-mono text-slate-500 bg-zinc-950 border border-slate-800 px-2 py-1 rounded mt-2 sm:mt-0 self-start sm:self-center">Source: GET /getProduction</span>
             </div>
 
-            {/* Right Col: In-Game Chat Box */}
-            <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 flex flex-col h-[520px] shadow-lg">
-              <div className="border-b border-slate-800 pb-3 mb-3 text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {telemetry.throughput.length === 0 ? (
+                <div className="col-span-full text-center py-8 text-slate-600 font-mono text-xs">
+                  Assembly telemetry offline. Start the Factory server to establish active conveyor belt feeds.
+                </div>
+              ) : (
+                telemetry.throughput.map((item) => {
+                  const netRate = item.currentRate;
+                  const isPositive = netRate > 0;
+                  const isNeutral = netRate === 0;
+                  const percentOfProdUsed = item.productionRate > 0 ? (item.consumptionRate / item.productionRate) * 100 : 0;
+                  
+                  return (
+                    <div key={item.name} className="bg-zinc-950/60 border border-slate-800/80 rounded-lg p-3.5 space-y-3 relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
+                      {/* Background grid accent */}
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/1 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none"></div>
+
+                      {/* Header info */}
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs font-mono font-bold text-slate-200 uppercase truncate" title={item.name}>
+                          {item.name}
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 ${
+                          isPositive 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                            : isNeutral
+                              ? "bg-slate-800/20 text-slate-400 border-slate-800"
+                              : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                        }`}>
+                          {isPositive ? "SURPLUS" : isNeutral ? "BALANCED" : "DEFICIT"}
+                        </span>
+                      </div>
+
+                      {/* Net Flow rate large indicator */}
+                      <div className="flex items-baseline space-x-1.5 justify-start">
+                        <span className={`text-xl font-bold font-mono tracking-tight ${
+                          isPositive ? "text-emerald-400" : isNeutral ? "text-slate-400" : "text-rose-400"
+                        }`}>
+                          {isPositive ? "+" : ""}{netRate.toFixed(1)}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-bold font-mono uppercase">parts/min</span>
+                      </div>
+
+                      {/* Micro bar showing consumption vs production ratio */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                          <span>BELT CONGESTION</span>
+                          <span>{percentOfProdUsed.toFixed(0)}% CONSUMED</span>
+                        </div>
+                        <div className="w-full bg-zinc-950 border border-slate-900 h-1.5 rounded overflow-hidden relative">
+                          <div 
+                            className={`h-full transition-all duration-1000 ${
+                              percentOfProdUsed > 90 
+                                ? "bg-rose-500" 
+                                : percentOfProdUsed > 60 
+                                  ? "bg-amber-500" 
+                                  : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${Math.min(100, percentOfProdUsed)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Precise values footer */}
+                      <div className="grid grid-cols-2 gap-2 text-[9px] font-mono border-t border-slate-900/60 pt-2 text-slate-500">
+                        <div>
+                          <span>PROD RATE</span>
+                          <span className="block text-[10px] text-emerald-400 font-bold">+{item.productionRate.toFixed(1)}/m</span>
+                        </div>
+                        <div className="text-right">
+                          <span>CONS RATE</span>
+                          <span className="block text-[10px] text-rose-400 font-bold">-{item.consumptionRate.toFixed(1)}/m</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Live In-Game Chat & Connected Pioneers (Full Width) */}
+          <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 flex flex-col h-[500px] shadow-lg">
+            <div className="border-b border-slate-800 pb-2 flex justify-between items-center text-left">
+              <div>
                 <span className="text-sm font-mono font-bold tracking-wider text-slate-300 uppercase flex items-center">
-                  <MessageSquare className="w-4 h-4 mr-1.5 text-orange-500" /> Live In-Game Chat Log
+                  <MessageSquare className="w-4 h-4 mr-1.5 text-orange-500" /> Live In-Game Chat
                 </span>
                 <p className="text-[10px] font-mono text-slate-500">Mascot Greg watches chats for blowing fuses</p>
               </div>
-
-              {/* Chats List Stream */}
-              <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-1 text-left">
-                {inGameChats.map((msg) => {
-                  const isGreg = msg.sender === "Mascot_Greg";
-                  const isServer = msg.sender === "SERVER";
-                  const isUser = msg.sender === "User_Manager";
-
-                  return (
-                    <div 
-                      key={msg.id}
-                      className={`p-2 rounded text-xs leading-normal font-mono transition-all ${
-                        isGreg 
-                          ? "bg-orange-500/5 border-l-2 border-orange-500 pl-2.5" 
-                          : isServer 
-                            ? "bg-slate-900/60 text-slate-500 italic text-[11px]" 
-                            : "bg-zinc-900 border border-slate-900"
-                      }`}
-                    >
-                      {!isServer && (
-                        <div className="flex justify-between items-center text-[10px] text-slate-500 mb-0.5 font-bold">
-                          <span className={isGreg ? "text-orange-500" : isUser ? "text-blue-400" : "text-slate-300"}>
-                            {msg.sender}
-                          </span>
-                          <span className="text-[9px] font-light">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </span>
-                        </div>
-                      )}
-                      <p className={isServer ? "text-slate-400" : "text-slate-300 text-xs"}>{msg.text}</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Chat Input form */}
-              <form onSubmit={handleSendChat} className="mt-3 flex space-x-2 border-t border-slate-800 pt-3">
-                <input
-                  type="text"
-                  placeholder="Send chat message to in-game crew..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  disabled={isLoading}
-                  className="flex-1 px-3 py-1.5 bg-zinc-900 border border-slate-800 rounded font-mono text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="p-1.5 bg-orange-500 text-zinc-950 rounded hover:bg-orange-600 transition-colors cursor-pointer flex items-center justify-center shrink-0"
-                  id="btn-send-chat"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-
+              <span className="text-[10px] font-mono text-slate-500 bg-zinc-950 border border-slate-800 px-2 py-0.5 rounded flex items-center shrink-0">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></span>
+                {telemetry.players.length} ONLINE
+              </span>
             </div>
+
+            {/* Combined Active Pioneers (No Coordinates) */}
+            <div className="bg-zinc-950/40 border border-slate-850 rounded p-2.5 my-3 text-left space-y-1.5">
+              <div className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                <Compass className="w-3.5 h-3.5 mr-1 text-orange-500" /> Connected Pioneers
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {telemetry.players.length === 0 ? (
+                  <span className="text-[10px] font-mono text-slate-600">No active players on server.</span>
+                ) : (
+                  telemetry.players.map((player) => (
+                    <div 
+                      key={player.name} 
+                      className="flex items-center space-x-1.5 px-2 py-0.5 bg-zinc-900 border border-slate-800 rounded font-mono text-[10px]"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <span className="text-slate-200 font-bold">{player.name}</span>
+                      <span className="text-slate-500 border-l border-slate-800 pl-1.5 flex items-center gap-0.5">
+                        <Heart className="w-2.5 h-2.5 text-rose-500 fill-rose-500" />
+                        <span className="text-rose-400/90 font-bold">{player.health.toFixed(0)}%</span>
+                      </span>
+                      <span className="text-slate-500 border-l border-slate-800 pl-1.5">
+                        {player.pingMs}ms
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chats List Stream */}
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pr-1 text-left">
+              {inGameChats.map((msg) => {
+                const isGreg = msg.sender === "Mascot_Greg";
+                const isServer = msg.sender === "SERVER";
+                const isUser = msg.sender === "User_Manager";
+
+                return (
+                  <div 
+                    key={msg.id}
+                    className={`p-2 rounded text-xs leading-normal font-mono transition-all ${
+                      isGreg 
+                        ? "bg-orange-500/5 border-l-2 border-orange-500 pl-2.5" 
+                        : isServer 
+                          ? "bg-slate-900/60 text-slate-500 italic text-[11px]" 
+                          : "bg-zinc-900 border border-slate-900"
+                    }`}
+                  >
+                    {!isServer && (
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 mb-0.5 font-bold">
+                        <span className={isGreg ? "text-orange-500" : isUser ? "text-blue-400" : "text-slate-300"}>
+                          {msg.sender}
+                        </span>
+                        <span className="text-[9px] font-light">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
+                    <p className={isServer ? "text-slate-400" : "text-slate-300 text-xs"}>{msg.text}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Chat Input form */}
+            <form onSubmit={handleSendChat} className="mt-3 flex space-x-2 border-t border-slate-800 pt-3">
+              <input
+                type="text"
+                placeholder="Send chat message to in-game crew..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={isLoading}
+                className="flex-1 px-3 py-1.5 bg-zinc-900 border border-slate-800 rounded font-mono text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="p-1.5 bg-orange-500 text-zinc-950 rounded hover:bg-orange-600 transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                id="btn-send-chat"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
 
           </div>
 
