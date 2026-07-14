@@ -131,12 +131,37 @@ apt-get update -y
 echo "steam steam/question select I AGREE" | debconf-set-selections
 echo "steam steam/license note" | debconf-set-selections
 
-# Install SteamCMD package
-apt-get install -y steamcmd
+# Install SteamCMD dependencies (especially 32-bit architecture support)
+log_info "Installing SteamCMD 32-bit pre-requisite libraries..."
+apt-get install -y lib32gcc-s1 libc6-i386 ca-certificates curl tar wget || apt-get install -y lib32gcc1 libc6-i386 ca-certificates curl tar wget || true
 
-# Link SteamCMD executable for global access
-ln -sf /usr/games/steamcmd /usr/local/bin/steamcmd
-log_success "SteamCMD installed and globally linked."
+# Install SteamCMD package or fallback to manual download
+if apt-get install -y steamcmd; then
+    # Link SteamCMD executable for global access
+    ln -sf /usr/games/steamcmd /usr/local/bin/steamcmd
+    log_success "SteamCMD installed via apt-get and globally linked."
+else
+    log_warning "apt-get was unable to locate or install 'steamcmd'. Proceeding with manual SteamCMD installation..."
+    
+    # Download the official SteamCMD archive from Steam CDN
+    mkdir -p /usr/share/steamcmd
+    log_info "Downloading official SteamCMD archive from Valve CDN..."
+    wget -qO /usr/share/steamcmd/steamcmd_linux.tar.gz "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
+    
+    # Create the robust wrapper script that sets up local home directory SteamCMD instance on-the-fly
+    log_info "Creating global user-friendly wrapper script /usr/local/bin/steamcmd..."
+    cat <<'EOF' > /usr/local/bin/steamcmd
+#!/bin/bash
+USER_STEAMCMD_DIR="$HOME/.steamcmd"
+if [ ! -f "$USER_STEAMCMD_DIR/steamcmd.sh" ]; then
+    mkdir -p "$USER_STEAMCMD_DIR"
+    tar -xzf /usr/share/steamcmd/steamcmd_linux.tar.gz -C "$USER_STEAMCMD_DIR"
+fi
+exec "$USER_STEAMCMD_DIR/steamcmd.sh" "$@"
+EOF
+    chmod +x /usr/local/bin/steamcmd
+    log_success "SteamCMD manual setup completed with high-reliability home-directory sandbox."
+fi
 
 # ------------------------------------------------------------------------------
 # 7. SML MOD MANAGER CLI (ficsit-cli) INSTALLATION
