@@ -263,7 +263,9 @@ sudo -i -u "$TARGET_USER" bash <<'EOF'
   echo "----------------------------------------------------------------------"
   
   # Fetch Satisfactory Dedicated Server (V2 Experimental / Production Branch)
-  steamcmd +force_install_dir /home/satisfactory/satisfactory-server \
+  steamcmd +@sSteamCmdForcePlatformType linux \
+           +@sSteamCmdForcePlatformBitness 64 \
+           +force_install_dir /home/satisfactory/satisfactory-server \
            +login anonymous \
            +app_update 1690800 validate \
            +quit
