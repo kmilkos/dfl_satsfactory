@@ -179,9 +179,49 @@ if [ -n "$FICSIT_RELEASE_URL" ]; then
   rm -rf /tmp/ficsit-cli.tar.gz /tmp/ficsit-extracted
   log_success "ficsit-cli installed to /usr/local/bin/ficsit-cli"
 else
-  log_warning "Failed to locate dynamic ficsit-cli download URL, downloading static fallback v2.5.0..."
-  wget -qO /usr/local/bin/ficsit-cli "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v2.5.0/ficsit-cli-linux-amd64"
-  chmod +x /usr/local/bin/ficsit-cli
+  log_warning "Failed to locate dynamic ficsit-cli download URL."
+  echo -e "\n${YELLOW}======================================================================${NC}"
+  echo -e " ${RED}[WARNING] Unable to resolve latest ficsit-cli release dynamically.${NC}"
+  echo -e " Please visit the manual download page to grab the archive file URL:"
+  echo -e "   ${GREEN}https://github.com/satisfactorymodding/ficsit-cli/releases${NC}"
+  echo -e " Copy the link to the Linux package (usually named ${CYAN}ficsit-cli-linux-amd64.tar.gz${NC} or similar zip)."
+  echo -e "${YELLOW}======================================================================${NC}\n"
+  
+  # Allow the user to paste the direct archive URL manually
+  read -p "Please enter the URL of the ficsit-cli archive (or press ENTER to use the static fallback): " USER_FICSIT_URL
+  
+  if [ -n "$USER_FICSIT_URL" ]; then
+    log_info "Downloading user-specified ficsit-cli from: $USER_FICSIT_URL"
+    wget -qO /tmp/ficsit-cli-user.archive "$USER_FICSIT_URL"
+    mkdir -p /tmp/ficsit-extracted
+    
+    # Handle ZIP vs TAR.GZ extraction
+    if [[ "$USER_FICSIT_URL" == *.zip ]]; then
+      apt-get install -y unzip >/dev/null 2>&1 || true
+      unzip -q -o /tmp/ficsit-cli-user.archive -d /tmp/ficsit-extracted
+    else
+      tar -xzf /tmp/ficsit-cli-user.archive -C /tmp/ficsit-extracted || unzip -q -o /tmp/ficsit-cli-user.archive -d /tmp/ficsit-extracted || true
+    fi
+    
+    # Robustly find binary
+    BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" | head -n 1)
+    if [ -n "$BINARY_PATH" ]; then
+      mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
+      chmod +x /usr/local/bin/ficsit-cli
+      log_success "Successfully installed ficsit-cli from user-specified package!"
+    else
+      log_error "Could not find 'ficsit-cli' executable inside the extracted archive."
+    fi
+    rm -rf /tmp/ficsit-cli-user.archive /tmp/ficsit-extracted
+  fi
+  
+  # Fallback check if manual entry wasn't successful or skipped
+  if [ ! -f /usr/local/bin/ficsit-cli ]; then
+    log_warning "No manual package successfully loaded. Fetching static fallback v2.5.0..."
+    wget -qO /usr/local/bin/ficsit-cli "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v2.5.0/ficsit-cli-linux-amd64"
+    chmod +x /usr/local/bin/ficsit-cli
+    log_success "Successfully installed ficsit-cli static fallback v2.5.0."
+  fi
 fi
 
 # ------------------------------------------------------------------------------
