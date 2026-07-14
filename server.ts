@@ -596,42 +596,133 @@ app.post("/api/server/action", (req, res) => {
   if (action === 'START') {
     serverState.status = 'STARTING';
     saveServerState();
-    addLog("INFO", "LogFactoryGame: Display: Starting dedicated server instance...");
+
+    addLog("INFO", "LogDaemonForge: Display: Initializing Satisfactory server daemon service via systemd...");
+    
+    setTimeout(() => {
+      addLog("INFO", "LogFactoryGame: Display: Starting dedicated server instance (AppID 1690800)...");
+    }, 1000);
+
+    setTimeout(() => {
+      addLog("INFO", "LogFactoryGame: Display: SML SMLv3.8.0-Build2 found in SML directory.");
+      const activeMods = mods.filter(m => m.installed && m.enabled);
+      activeMods.forEach((mod, idx) => {
+        setTimeout(() => {
+          addLog("INFO", `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...`);
+        }, idx * 150);
+      });
+    }, 2000);
+
+    setTimeout(() => {
+      addLog("INFO", `LogFactoryGame: Display: Loading save game '${serverState.sessionName}'...`);
+    }, 3200);
+
+    setTimeout(() => {
+      addLog("INFO", "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777.");
+    }, 4500);
+
     setTimeout(() => {
       runAutoInstallQueue();
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
       saveServerState();
       addLog("INFO", "LogFactoryGame: Display: Server started. Network status green. Loaded session: " + serverState.sessionName);
-    }, 4000);
+      addLog("INFO", "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections.");
+    }, 5500);
+
   } else if (action === 'STOP') {
+    addLog("WARNING", "LogDaemonForge: Display: Shutdown sequence initiated by operator request.");
+    addLog("WARNING", "LogNet: Join: Releasing active player sessions...");
+    
     serverState.status = 'OFFLINE';
     serverState.uptime = 0;
     serverState.playersOnline = 0;
     saveServerState();
-    addLog("WARNING", "LogFactoryGame: Display: Shutdown sequence initiated. Fuses cleared.");
+
+    setTimeout(() => {
+      addLog("INFO", `LogFactoryGame: Display: Saving game state '${serverState.sessionName}' before termination...`);
+    }, 800);
+
+    setTimeout(() => {
+      addLog("INFO", `LogFactoryGame: Display: Auto-saving current state into 'ServerSave_DaemonForge_v3_Shutdown.sav' completed.`);
+    }, 1800);
+
+    setTimeout(() => {
+      addLog("WARNING", "LogFactoryGame: Display: Shutdown sequence complete. Fuses cleared. Process terminated.");
+    }, 2800);
+
   } else if (action === 'RESTART') {
     serverState.status = 'STARTING';
     serverState.playersOnline = 0;
     saveServerState();
-    addLog("WARNING", "LogFactoryGame: Display: Reboot command executed by DFL daemon.");
+
+    addLog("WARNING", "LogDaemonForge: Display: Warm reboot command executed by operator via panel.");
+    addLog("WARNING", "LogNet: Join: Terminating active client sessions...");
+    
+    setTimeout(() => {
+      addLog("INFO", `LogFactoryGame: Display: Triggering crash-safe autosave for session '${serverState.sessionName}'...`);
+    }, 600);
+
+    setTimeout(() => {
+      addLog("INFO", "LogFactoryGame: Display: Stopping Dedicated Server daemon instance...");
+    }, 1500);
+
+    setTimeout(() => {
+      addLog("INFO", "LogDaemonForge: Display: Booting dedicated server instance (Warm restart)...");
+    }, 2400);
+
+    setTimeout(() => {
+      addLog("INFO", "LogFactoryGame: Display: SML SMLv3.8.0-Build2 initialized.");
+      const activeMods = mods.filter(m => m.installed && m.enabled);
+      activeMods.forEach((mod, idx) => {
+        setTimeout(() => {
+          addLog("INFO", `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...`);
+        }, idx * 150);
+      });
+    }, 3200);
+
     setTimeout(() => {
       runAutoInstallQueue();
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
       saveServerState();
-      addLog("INFO", "LogFactoryGame: Display: Warm reboot complete. Session restored.");
-    }, 3000);
+      addLog("INFO", "LogFactoryGame: Display: Warm reboot complete. Network status green. Session restored.");
+    }, 4800);
+
   } else if (action === 'UPDATE') {
     serverState.status = 'UPDATING';
     saveServerState();
-    addLog("INFO", "LogDaemonForge: Display: Running SteamCMD update for AppID 1690800...");
+
+    addLog("INFO", "LogDaemonForge: Display: Invoking SteamCMD script update for AppID 1690800...");
+    
+    setTimeout(() => {
+      addLog("INFO", "SteamCMD: Connecting anonymously to Steam Public...");
+    }, 1000);
+
+    setTimeout(() => {
+      addLog("INFO", "SteamCMD: Logging in user 'anonymous' OK");
+    }, 2000);
+
+    setTimeout(() => {
+      addLog("INFO", "SteamCMD: App '1690800' state is 0x111. Initiating download job...");
+    }, 3000);
+
+    setTimeout(() => {
+      addLog("INFO", "SteamCMD: Update state (0x3) Downloading item (14.2 MB / 14.2 MB) OK");
+    }, 4200);
+
+    setTimeout(() => {
+      addLog("INFO", "SteamCMD: Verifying item integrity... Success.");
+    }, 5200);
+
     setTimeout(() => {
       serverState.status = 'ONLINE';
+      serverState.uptime = 0;
       serverState.version = "1.0.0.13 (SML v3.8.0-Build3)";
       saveServerState();
-      addLog("INFO", "LogDaemonForge: SteamCMD update completed. Installed Version: v1.0.0.13.");
-    }, 6000);
+      addLog("INFO", "LogDaemonForge: Display: SteamCMD update complete. SML verified.");
+      addLog("INFO", "LogDaemonForge: Display: Restarting server instance automatically with SML v3.8.0-Build3.");
+    }, 6200);
   }
 
   res.json({ success: true, status: serverState.status });

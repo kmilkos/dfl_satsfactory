@@ -31,7 +31,7 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus }:
           }`}
           id="tab-btn-nodes"
         >
-          Satisfactory Nodes
+          Satisfactory Node
         </button>
         <button
           onClick={() => setActiveTab("backups")}
