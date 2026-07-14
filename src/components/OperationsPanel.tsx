@@ -22,6 +22,7 @@ interface OperationsPanelProps {
   onInstallMod: (id: string) => Promise<void>;
   onUninstallMod: (id: string) => Promise<void>;
   onToggleModdingProfile: (enabled: boolean) => Promise<void>;
+  onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -40,8 +41,42 @@ export default function OperationsPanel({
   onInstallMod,
   onUninstallMod,
   onToggleModdingProfile,
+  onRefreshStatus,
   isLoading
 }: OperationsPanelProps) {
+
+  // Create game session inputs
+  const [newSessionName, setNewSessionName] = useState("");
+  const [startingBiome, setStartingBiome] = useState("Grass Fields");
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [createSessionError, setCreateSessionError] = useState("");
+
+  const handleCreateSession = async () => {
+    if (!newSessionName.trim()) return;
+    setIsCreatingSession(true);
+    setCreateSessionError("");
+    try {
+      const response = await fetch("/api/server/create-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionName: newSessionName, biome: startingBiome })
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to create session.");
+      }
+      setTimeout(async () => {
+        setIsCreatingSession(false);
+        setNewSessionName("");
+        if (onRefreshStatus) {
+          await onRefreshStatus();
+        }
+      }, 1500);
+    } catch (e: any) {
+      setCreateSessionError(e.message || "An error occurred.");
+      setIsCreatingSession(false);
+    }
+  };
 
   // Backup configuration inputs
   const [backupEnabled, setBackupEnabled] = useState(serverInfo.autoBackupEnabled);
@@ -310,6 +345,73 @@ export default function OperationsPanel({
                   <span className="text-xs font-mono font-bold">SML UPDATE</span>
                 </button>
               </div>
+
+              {/* Initialize Game Session (Rendered only if server is ONLINE and has no active session) */}
+              {serverStatus === "ONLINE" && serverInfo.sessionName?.startsWith("None") && (
+                <div className="bg-zinc-950 border-2 border-orange-500/30 rounded-lg p-5 space-y-4">
+                  <div className="flex items-center space-x-2 text-orange-400">
+                    <Plus className="w-5 h-5 animate-pulse" />
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider">Initialize Game Session</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-mono leading-relaxed text-left">
+                    The server daemon is running, but no save game session is active. You must initialize a new session so players can connect.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-mono text-slate-400 uppercase font-bold">New Session Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. MyAwesomeFactory"
+                        value={newSessionName}
+                        onChange={(e) => setNewSessionName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                        className="w-full bg-zinc-900 border border-slate-800 text-xs font-mono text-slate-200 px-3 py-2 rounded focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-mono text-slate-400 uppercase font-bold">Starting Biome</label>
+                      <select
+                        value={startingBiome}
+                        onChange={(e) => setStartingBiome(e.target.value)}
+                        className="w-full bg-zinc-900 border border-slate-800 text-xs font-mono text-slate-200 px-3 py-2 rounded focus:outline-none focus:border-orange-500 cursor-pointer"
+                      >
+                        <option value="Grass Fields">Grass Fields (Beginner)</option>
+                        <option value="Rocky Desert">Rocky Desert (Moderate)</option>
+                        <option value="Northern Forest">Northern Forest (Hard)</option>
+                        <option value="Dune Desert">Dune Desert (Expert)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={handleCreateSession}
+                      disabled={isCreatingSession || !newSessionName.trim()}
+                      className={`flex items-center px-4 py-2 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                        !newSessionName.trim() || isCreatingSession
+                          ? "bg-slate-800 text-slate-500 border border-slate-700"
+                          : "bg-orange-600 hover:bg-orange-500 text-white border border-orange-500"
+                      }`}
+                    >
+                      {isCreatingSession ? (
+                        <>
+                          <RotateCw className="w-4 h-4 mr-1.5 animate-spin" />
+                          INITIALIZING WORLD...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 mr-1.5" />
+                          INITIALIZE & START SESSION
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {createSessionError && (
+                    <p className="text-[11px] text-red-400 font-mono text-left">{createSessionError}</p>
+                  )}
+                </div>
+              )}
 
               {/* Startup configuration file visualizer block */}
               <div className="bg-zinc-900 border border-slate-800 rounded p-4 text-xs font-mono space-y-3">

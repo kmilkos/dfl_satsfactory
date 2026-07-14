@@ -76,11 +76,17 @@ let serverState = loadState("server_state.json", {
   uptime: 14204, // seconds
   playersOnline: 0,
   maxPlayers: 8,
-  sessionName: "DaemonForge_Main_World",
+  sessionName: "None (No Active Session)",
   autoBackupEnabled: true,
   backupIntervalMinutes: 15,
   moddingEnabled: true,
 });
+
+// Run a migration step to uninitialize session name if it was set to the default mock name
+if (serverState.sessionName === "DaemonForge_Main_World") {
+  serverState.sessionName = "None (No Active Session)";
+  saveServerState();
+}
 
 let backups = loadState("backups.json", [
   {
@@ -210,14 +216,20 @@ const buildInitialConsoleLogs = () => {
     }
   });
 
-  startupLogs.push(
-    { timestamp: new Date(Date.now() - 1780 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Loading save game 'ServerSave_DaemonForge_v3'..." },
-    { timestamp: new Date(Date.now() - 1775 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777." },
-    { timestamp: new Date(Date.now() - 1770 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." },
-    { timestamp: new Date(Date.now() - 600 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Greg_DFL entered the lobby (SteamID: 76561198000000000)." },
-    { timestamp: new Date(Date.now() - 300 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Mascot_Greg entered the lobby (SteamID: 76561198011223344)." },
-    { timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), level: "INFO", message: "LogDaemonForge: Display: Automated backup system created 'ServerSave_DaemonForge_v3_Auto_1.sav' successfully." }
-  );
+  if (serverState.sessionName && !serverState.sessionName.startsWith("None")) {
+    startupLogs.push(
+      { timestamp: new Date(Date.now() - 1780 * 1000).toISOString(), level: "INFO", message: `LogFactoryGame: Display: Loading save game 'ServerSave_${serverState.sessionName}'...` },
+      { timestamp: new Date(Date.now() - 1775 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777." },
+      { timestamp: new Date(Date.now() - 1770 * 1000).toISOString(), level: "INFO", message: `LogFactoryGame: Display: Server started. Network status green. Loaded session: ${serverState.sessionName}` },
+      { timestamp: new Date(Date.now() - 1765 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." }
+    );
+  } else {
+    startupLogs.push(
+      { timestamp: new Date(Date.now() - 1780 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777." },
+      { timestamp: new Date(Date.now() - 1775 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections on 0.0.0.0:7777." },
+      { timestamp: new Date(Date.now() - 1770 * 1000).toISOString(), level: "WARNING", message: "LogFactoryGame: Display: Server is currently IDLE with no active game session loaded. Awaiting session initialization or connection via Server Manager." }
+    );
+  }
 
   return startupLogs;
 };
@@ -303,11 +315,7 @@ setInterval(async () => {
     // 1. Fetch live players from Ficsit Remote Monitoring API
     let rawPlayers = await fetchFromFRM("/getPlayer");
     if (!Array.isArray(rawPlayers)) {
-      rawPlayers = [
-        { PlayerName: "Greg_DFL", PlayerPing: 42, PlayerHealth: 100, PlayerLocation: { X: 110452, Y: -24890, Z: 5410 } },
-        { PlayerName: "Becky_FICSIT", PlayerPing: 18, PlayerHealth: 100, PlayerLocation: { X: -54102, Y: 142095, Z: -1202 } },
-        { PlayerName: "FICSIT_Pioneer", PlayerPing: 55, PlayerHealth: 85, PlayerLocation: { X: 32049, Y: 89344, Z: 125 } }
-      ];
+      rawPlayers = [];
     }
     const currentPlayers = rawPlayers.map((p: any) => p.PlayerName || "");
 
@@ -660,15 +668,26 @@ const getStartLogs = () => {
     { level: 'INFO', message: "LogFactoryGame: Display: Satisfactory Dedicated Server starting..." },
     { level: 'INFO', message: "LogFactoryGame: Display: Loading Server Configuration settings..." },
     { level: 'INFO', message: "LogFactoryGame: Display: Max players set to " + serverState.maxPlayers },
-    { level: 'INFO', message: "LogFactoryGame: Display: Auto-Backup system initialized: " + serverState.backupIntervalMinutes + " minute interval." },
-    { level: 'INFO', message: `LogFactoryGame: Display: Loading save game '${serverState.sessionName}'...` },
-    { level: 'INFO', message: "LogFactoryGame: Display: World composition: loading 243 streaming chunks..." },
-    { level: 'INFO', message: "LogFactoryGame: Display: Loaded 8347 actors, 1240 power connectors, 492 conveyor paths." },
-    { level: 'INFO', message: "LogFactoryGame: Display: Subsystem: PowerGridManager status compiled. 3 active grids." },
-    { level: 'INFO', message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777 UDP." },
-    { level: 'INFO', message: "LogFactoryGame: Display: Server started. Network status green. Loaded session: " + serverState.sessionName },
-    { level: 'INFO', message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." }
+    { level: 'INFO', message: "LogFactoryGame: Display: Auto-Backup system initialized: " + serverState.backupIntervalMinutes + " minute interval." }
   );
+
+  if (serverState.sessionName && !serverState.sessionName.startsWith("None")) {
+    list.push(
+      { level: 'INFO', message: `LogFactoryGame: Display: Loading save game '${serverState.sessionName}'...` },
+      { level: 'INFO', message: "LogFactoryGame: Display: World composition: loading 243 streaming chunks..." },
+      { level: 'INFO', message: "LogFactoryGame: Display: Loaded 8347 actors, 1240 power connectors, 492 conveyor paths." },
+      { level: 'INFO', message: "LogFactoryGame: Display: Subsystem: PowerGridManager status compiled. 3 active grids." },
+      { level: 'INFO', message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777 UDP." },
+      { level: 'INFO', message: "LogFactoryGame: Display: Server started. Network status green. Loaded session: " + serverState.sessionName },
+      { level: 'INFO', message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." }
+    );
+  } else {
+    list.push(
+      { level: 'INFO', message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777 UDP." },
+      { level: 'INFO', message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections on 0.0.0.0:7777." },
+      { level: 'WARNING', message: "LogFactoryGame: Display: Server is currently IDLE with no active game session loaded. Awaiting session initialization or connection via Server Manager." }
+    );
+  }
 
   return list;
 };
@@ -677,13 +696,25 @@ const getStopLogs = () => {
   const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
   
   list.push(
-    { level: 'WARNING', message: "LogDaemonForge: Display: Shutdown sequence initiated by operator request." },
-    { level: 'WARNING', message: "LogNet: Join: Releasing active player sessions..." },
-    { level: 'INFO', message: "LogNet: Join: Client 'Greg_DFL' disconnected (Reason: Host shutdown)." },
-    { level: 'INFO', message: "LogNet: Join: Client 'Mascot_Greg' disconnected (Reason: Host shutdown)." },
-    { level: 'INFO', message: `LogFactoryGame: Display: Saving game state '${serverState.sessionName}' before termination...` },
-    { level: 'INFO', message: "LogFactoryGame: Display: Serializing game state... 14.5 MB written." },
-    { level: 'INFO', message: `LogFactoryGame: Display: Auto-saving current state into 'ServerSave_DaemonForge_v3_Shutdown.sav' completed.` },
+    { level: 'WARNING', message: "LogDaemonForge: Display: Shutdown sequence initiated by operator request." }
+  );
+
+  if (serverState.playersOnline > 0) {
+    list.push(
+      { level: 'WARNING', message: "LogNet: Join: Releasing active player sessions..." },
+      { level: 'INFO', message: "LogNet: Join: Client disconnected (Reason: Host shutdown)." }
+    );
+  }
+
+  if (serverState.sessionName && !serverState.sessionName.startsWith("None")) {
+    list.push(
+      { level: 'INFO', message: `LogFactoryGame: Display: Saving game state '${serverState.sessionName}' before termination...` },
+      { level: 'INFO', message: "LogFactoryGame: Display: Serializing game state... 14.5 MB written." },
+      { level: 'INFO', message: `LogFactoryGame: Display: Auto-saving current state into 'ServerSave_DaemonForge_v3_Shutdown.sav' completed.` }
+    );
+  }
+
+  list.push(
     { level: 'INFO', message: "LogModding: Display: Triggering mod shutdown sequences..." }
   );
 
@@ -705,12 +736,24 @@ const getRestartLogs = () => {
   const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
   
   list.push(
-    { level: 'WARNING', message: "LogDaemonForge: Display: Warm reboot command executed by operator via panel." },
-    { level: 'WARNING', message: "LogNet: Join: Terminating active client sessions..." },
-    { level: 'INFO', message: "LogNet: Join: Client 'Greg_DFL' disconnected (Reason: Warm reboot)." },
-    { level: 'INFO', message: "LogNet: Join: Client 'Mascot_Greg' disconnected (Reason: Warm reboot)." },
-    { level: 'INFO', message: `LogFactoryGame: Display: Triggering crash-safe autosave for session '${serverState.sessionName}'...` },
-    { level: 'INFO', message: "LogFactoryGame: Display: Auto-saving current state... Completed." },
+    { level: 'WARNING', message: "LogDaemonForge: Display: Warm reboot command executed by operator via panel." }
+  );
+
+  if (serverState.playersOnline > 0) {
+    list.push(
+      { level: 'WARNING', message: "LogNet: Join: Terminating active client sessions..." },
+      { level: 'INFO', message: "LogNet: Join: Client disconnected (Reason: Warm reboot)." }
+    );
+  }
+
+  if (serverState.sessionName && !serverState.sessionName.startsWith("None")) {
+    list.push(
+      { level: 'INFO', message: `LogFactoryGame: Display: Triggering crash-safe autosave for session '${serverState.sessionName}'...` },
+      { level: 'INFO', message: "LogFactoryGame: Display: Auto-saving current state... Completed." }
+    );
+  }
+
+  list.push(
     { level: 'INFO', message: "LogFactoryGame: Display: Stopping Dedicated Server daemon instance..." },
     { level: 'INFO', message: "LogNet: Socket closed on 0.0.0.0:7777 UDP." },
     { level: 'INFO', message: "LogDaemonForge: Display: Booting dedicated server instance (Warm restart)..." }
@@ -802,6 +845,51 @@ app.post("/api/server/action", (req, res) => {
   res.json({ success: true, status: serverState.status });
 });
 
+app.post("/api/server/create-session", (req, res) => {
+  const { sessionName, biome } = req.body;
+  if (!sessionName) {
+    return res.status(400).json({ error: "Session name is required." });
+  }
+
+  const sanitizedName = sessionName.replace(/[^a-zA-Z0-9_]/g, '');
+  addLog("COMMAND", `dfl-panel execution: create session -> Name: ${sanitizedName}, Biome: ${biome || "Grass Fields"}`);
+  
+  serverState.status = 'STARTING';
+  saveServerState();
+
+  const loadLogs: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [
+    { level: 'INFO', message: `LogFactoryGame: Display: Creating new game session '${sanitizedName}'...` },
+    { level: 'INFO', message: `LogFactoryGame: Display: Generating new world level with biome: ${biome || "Grass Fields"}...` },
+    { level: 'INFO', message: "LogFactoryGame: Display: World composition: loading biomes and foliage actors..." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Generation completed in 1.4 seconds. Placing HUB location..." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Initializing Tier 0 subsystems: GamePhaseManager, SchematicsManager." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Auto-saving initial session state into 'ServerSave_${sanitizedName}_Auto_0.sav'...` },
+    { level: 'INFO', message: "LogFactoryGame: Display: Save complete. 1.2 MB written." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Loaded session '${sanitizedName}' successfully.` },
+    { level: 'INFO', message: `LogFactoryGame: Display: Server started. Network status green. Loaded session: ${sanitizedName}` }
+  ];
+
+  streamLogs(loadLogs, 150, () => {
+    serverState.status = 'ONLINE';
+    serverState.sessionName = sanitizedName;
+    saveServerState();
+    
+    // Add an initial backup snapshot for this slot to make it authentic
+    const backupId = `bak_${Math.floor(Math.random() * 90000) + 10000}`;
+    backups.unshift({
+      id: backupId,
+      filename: `ServerSave_${sanitizedName}_Auto_0.sav`,
+      timestamp: new Date().toISOString(),
+      sizeBytes: 1205120, // smaller initial size
+      isAuto: true,
+      saveSlot: sanitizedName,
+    });
+    saveBackups();
+  });
+
+  res.json({ success: true });
+});
+
 // 2. Automated & Saved Backups Panel
 app.get("/api/backups", (req, res) => {
   res.json(backups);
@@ -810,6 +898,10 @@ app.get("/api/backups", (req, res) => {
 app.post("/api/backups/trigger", (req, res) => {
   if (serverState.status !== 'ONLINE') {
     return res.status(400).json({ error: "Server must be ONLINE to execute save file snapshot." });
+  }
+
+  if (serverState.sessionName && serverState.sessionName.startsWith("None")) {
+    return res.status(400).json({ error: "Cannot trigger backup snapshot. No active save game session is loaded. Create a session or load a save game first." });
   }
 
   const id = `bak_${Math.floor(Math.random() * 90000) + 10000}`;
@@ -1048,6 +1140,17 @@ app.get("/api/telemetry", async (req, res) => {
     });
   }
 
+  if (serverState.sessionName && serverState.sessionName.startsWith("None")) {
+    return res.json({
+      cpuUsage: 0.5,
+      ramUsageGb: 0.28,
+      tps: 0.0,
+      powerGrids: [],
+      players: [],
+      throughput: []
+    });
+  }
+
   // Attempt to fetch actual live telemetry from FRM mod
   const rawPower = await fetchFromFRM("/getPower");
   const rawPlayers = await fetchFromFRM("/getPlayer");
@@ -1148,39 +1251,6 @@ app.post("/api/chat", (req, res) => {
   inGameChats.push(newMsg);
   saveChats();
   addLog("INFO", `LogChat: [${newMsg.sender}]: ${newMsg.text}`);
-
-  // Greg mascot reactive chatter simulation!
-  if (sender !== "Mascot_Greg") {
-    setTimeout(() => {
-      let responseText = "";
-      const query = text.toLowerCase();
-      if (query.includes("mod") || query.includes("sml")) {
-        responseText = "ficsit-cli handles package locks correctly. Don't touch SML unless you want modular power to compile into sand.";
-      } else if (query.includes("fuse") || query.includes("power") || query.includes("grid")) {
-        responseText = "Grid 2 capacity is redlined. Standard automated load-shifter hasn't booted because someone skipped wiring the switchboards.";
-      } else if (query.includes("backup") || query.includes("save")) {
-        responseText = "Yes, automated snapshot is running. 15-minute interval offsets risk of save corruption, unlike manual save spamming.";
-      } else {
-        const gregSnarks = [
-          "My processors are running 60 ticks per second. Please restrict discussions to active thermal loads.",
-          "I've logged that. System analytics indicate a 42% decrease in grid stability when players jump on conveyor belts.",
-          "¯\\_(ツ)_/¯. Booting the heavy iron frame logistics right now.",
-          "Another day of keeping SML profiles from collapsing into standard stack overflows. Carry on."
-        ];
-        responseText = gregSnarks[Math.floor(Math.random() * gregSnarks.length)];
-      }
-
-      const gregMsg = {
-        id: `msg_${Date.now() + 1}`,
-        sender: "Mascot_Greg",
-        text: responseText,
-        timestamp: new Date().toISOString()
-      };
-      inGameChats.push(gregMsg);
-      saveChats();
-      addLog("INFO", `LogChat: [Mascot_Greg]: ${gregMsg.text}`);
-    }, 1500);
-  }
 
   res.json(newMsg);
 });

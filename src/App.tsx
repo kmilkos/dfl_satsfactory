@@ -20,7 +20,7 @@ export default function App() {
     uptime: 0,
     playersOnline: 0,
     maxPlayers: 8,
-    sessionName: "DaemonForge_Main_World",
+    sessionName: "None (No Active Session)",
     autoBackupEnabled: true,
     backupIntervalMinutes: 15,
     moddingEnabled: true,
@@ -343,6 +343,7 @@ export default function App() {
                 onInstallMod={handleInstallMod}
                 onUninstallMod={handleUninstallMod}
                 onToggleModdingProfile={handleToggleModdingProfile}
+                onRefreshStatus={fetchStatus}
                 isLoading={isLoading}
               />
             )}
