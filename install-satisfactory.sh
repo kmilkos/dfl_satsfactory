@@ -167,17 +167,38 @@ fi
 # 7. SML MOD MANAGER CLI (ficsit-cli) INSTALLATION
 # ------------------------------------------------------------------------------
 log_info "Fetching latest production ficsit-cli (SML Modding Tool)..."
-FICSIT_RELEASE_URL=$(curl -s https://api.github.com/repos/satisfactorymodding/ficsit-cli/releases/latest | grep "browser_download_url" | grep "linux-amd64" | head -n 1 | cut -d '"' -f 4 || echo "")
+# Query the latest release info from GitHub API
+RELEASES_JSON=$(curl -s https://api.github.com/repos/satisfactorymodding/ficsit-cli/releases/latest)
+
+# Find direct binary file first (typically ficsit_linux_amd64 or ficsit-cli-linux-amd64)
+FICSIT_RELEASE_URL=$(echo "$RELEASES_JSON" | grep "browser_download_url" | grep -E "ficsit_(linux_amd64|linux-amd64)\"" | head -n 1 | cut -d '"' -f 4 || echo "")
+
+# If not found, look for any linux amd64 asset that is not .deb, .rpm, .apk, .txt, .tar.gz, .zip
+if [ -z "$FICSIT_RELEASE_URL" ]; then
+  FICSIT_RELEASE_URL=$(echo "$RELEASES_JSON" | grep "browser_download_url" | grep "linux" | grep "amd64" | grep -vE "\.(deb|rpm|apk|txt|tar\.gz|zip)\"" | head -n 1 | cut -d '"' -f 4 || echo "")
+fi
 
 if [ -n "$FICSIT_RELEASE_URL" ]; then
-  log_info "Downloading ficsit-cli binary: $FICSIT_RELEASE_URL"
-  wget -qO /tmp/ficsit-cli.tar.gz "$FICSIT_RELEASE_URL"
-  mkdir -p /tmp/ficsit-extracted
-  tar -xzf /tmp/ficsit-cli.tar.gz -C /tmp/ficsit-extracted
-  mv /tmp/ficsit-extracted/ficsit-cli /usr/local/bin/ficsit-cli
-  chmod +x /usr/local/bin/ficsit-cli
-  rm -rf /tmp/ficsit-cli.tar.gz /tmp/ficsit-extracted
-  log_success "ficsit-cli installed to /usr/local/bin/ficsit-cli"
+  if [[ "$FICSIT_RELEASE_URL" == *.tar.gz ]]; then
+    log_info "Downloading ficsit-cli archive: $FICSIT_RELEASE_URL"
+    wget -qO /tmp/ficsit-cli.tar.gz "$FICSIT_RELEASE_URL"
+    mkdir -p /tmp/ficsit-extracted
+    tar -xzf /tmp/ficsit-cli.tar.gz -C /tmp/ficsit-extracted
+    BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" -o -name "ficsit" | head -n 1)
+    if [ -n "$BINARY_PATH" ]; then
+      mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
+      chmod +x /usr/local/bin/ficsit-cli
+      log_success "ficsit-cli installed successfully from tarball."
+    else
+      log_error "Could not find binary inside extracted tarball."
+    fi
+    rm -rf /tmp/ficsit-cli.tar.gz /tmp/ficsit-extracted
+  else
+    log_info "Downloading ficsit-cli binary directly: $FICSIT_RELEASE_URL"
+    wget -qO /usr/local/bin/ficsit-cli "$FICSIT_RELEASE_URL"
+    chmod +x /usr/local/bin/ficsit-cli
+    log_success "ficsit-cli installed to /usr/local/bin/ficsit-cli"
+  fi
 else
   log_warning "Failed to locate dynamic ficsit-cli download URL."
   echo -e "\n${YELLOW}======================================================================${NC}"
@@ -237,10 +258,10 @@ else
   
   # Fallback check if manual entry wasn't successful or skipped
   if [ ! -f /usr/local/bin/ficsit-cli ]; then
-    log_warning "No manual package successfully loaded. Fetching static fallback v2.5.0..."
-    wget -qO /usr/local/bin/ficsit-cli "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v2.5.0/ficsit-cli-linux-amd64"
+    log_warning "No manual package successfully loaded. Fetching static fallback v0.7.1..."
+    wget -qO /usr/local/bin/ficsit-cli "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v0.7.1/ficsit_linux_amd64"
     chmod +x /usr/local/bin/ficsit-cli
-    log_success "Successfully installed ficsit-cli static fallback v2.5.0."
+    log_success "Successfully installed ficsit-cli static fallback v0.7.1."
   fi
 fi
 
