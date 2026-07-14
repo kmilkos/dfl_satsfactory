@@ -99,7 +99,7 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus }:
           }`}
           id="tab-btn-telemetry"
         >
-          FRM Telemetry
+          Factory Stats
         </button>
         <button
           onClick={() => setActiveTab("logs")}

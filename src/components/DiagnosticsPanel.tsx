@@ -98,7 +98,7 @@ export default function DiagnosticsPanel({
   return (
     <div className="w-full h-full text-slate-100 flex flex-col">
       {/* -----------------------------------------------------------------------
-          SUB-PANEL: FRM TELEMETRY & CHAT
+          SUB-PANEL: FACTORY STATS & CHAT
           ----------------------------------------------------------------------- */}
       {activeSubTab === "telemetry" && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -106,7 +106,7 @@ export default function DiagnosticsPanel({
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4">
             <div>
-              <h1 className="text-xl font-mono text-orange-500 uppercase tracking-wider font-bold">Ficsit Remote Monitoring Telemetry</h1>
+              <h1 className="text-xl font-mono text-orange-500 uppercase tracking-wider font-bold">Factory Stats Telemetry</h1>
               <p className="text-xs text-slate-400 font-mono mt-0.5">Live JSON REST API feeds proxying in-game operations on port 8080</p>
             </div>
             <div className="text-xs font-mono text-slate-400 mt-2 md:mt-0 bg-zinc-900 border border-slate-800 px-3 py-1.5 rounded flex items-center">

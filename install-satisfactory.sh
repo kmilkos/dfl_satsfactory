@@ -36,6 +36,21 @@ log_info "Initializing DaemonForge Satisfactory Deployment Pipeline..."
 sleep 1
 
 # ------------------------------------------------------------------------------
+# 1b. TIMEZONE CONFIGURATION (Europe/Athens)
+# ------------------------------------------------------------------------------
+log_info "Configuring system timezone to Europe/Athens..."
+if command -v timedatectl &>/dev/null; then
+  timedatectl set-timezone Europe/Athens || {
+    log_warning "timedatectl set-timezone failed, attempting manual timezone link fallback..."
+    ln -sf /usr/share/zoneinfo/Europe/Athens /etc/localtime
+  }
+else
+  log_info "timedatectl not available, applying manual timezone link to Europe/Athens..."
+  ln -sf /usr/share/zoneinfo/Europe/Athens /etc/localtime
+fi
+log_success "System timezone configured successfully to Europe/Athens."
+
+# ------------------------------------------------------------------------------
 # 2. CREATE SYSTEM USER (NON-ROOT: satisfactory)
 # ------------------------------------------------------------------------------
 TARGET_USER="satisfactory"
@@ -159,7 +174,7 @@ if [ ! -f "$USER_STEAMCMD_DIR/steamcmd.sh" ]; then
 fi
 exec "$USER_STEAMCMD_DIR/steamcmd.sh" "$@"
 EOF
-    chmod +x /usr/local/bin/steamcmd
+    chmod 755 /usr/local/bin/steamcmd
     log_success "SteamCMD manual setup completed with high-reliability home-directory sandbox."
 fi
 
@@ -187,7 +202,7 @@ if [ -n "$FICSIT_RELEASE_URL" ]; then
     BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" -o -name "ficsit" | head -n 1)
     if [ -n "$BINARY_PATH" ]; then
       mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
-      chmod +x /usr/local/bin/ficsit-cli
+      chmod 755 /usr/local/bin/ficsit-cli
       log_success "ficsit-cli installed successfully from tarball."
     else
       log_error "Could not find binary inside extracted tarball."
@@ -196,7 +211,7 @@ if [ -n "$FICSIT_RELEASE_URL" ]; then
   else
     log_info "Downloading ficsit-cli binary directly: $FICSIT_RELEASE_URL"
     wget -qO /usr/local/bin/ficsit-cli "$FICSIT_RELEASE_URL"
-    chmod +x /usr/local/bin/ficsit-cli
+    chmod 755 /usr/local/bin/ficsit-cli
     log_success "ficsit-cli installed to /usr/local/bin/ficsit-cli"
   fi
 else
@@ -247,7 +262,7 @@ else
       BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" | head -n 1)
       if [ -n "$BINARY_PATH" ]; then
         mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
-        chmod +x /usr/local/bin/ficsit-cli
+        chmod 755 /usr/local/bin/ficsit-cli
         log_success "Successfully installed ficsit-cli from user-specified package!"
       else
         log_error "Could not find 'ficsit-cli' executable inside the extracted archive."
@@ -260,7 +275,7 @@ else
   if [ ! -f /usr/local/bin/ficsit-cli ]; then
     log_warning "No manual package successfully loaded. Fetching static fallback v0.7.1..."
     wget -qO /usr/local/bin/ficsit-cli "https://github.com/satisfactorymodding/ficsit-cli/releases/download/v0.7.1/ficsit_linux_amd64"
-    chmod +x /usr/local/bin/ficsit-cli
+    chmod 755 /usr/local/bin/ficsit-cli
     log_success "Successfully installed ficsit-cli static fallback v0.7.1."
   fi
 fi
@@ -269,6 +284,11 @@ fi
 # 8. SATISFACTORY DEDICATED SERVER DEPLOYMENT (Under non-root user context)
 # ------------------------------------------------------------------------------
 log_info "Switching context to non-root user '$TARGET_USER' for directory provisioning..."
+
+# Pre-emptively correct any permission leakage on the target user's home directory.
+# If files were previously written as root, this recursively restores correct ownership.
+mkdir -p "/home/$TARGET_USER"
+chown -R "$TARGET_USER:$TARGET_USER" "/home/$TARGET_USER"
 
 sudo -i -u "$TARGET_USER" bash <<'EOF'
   set -euo pipefail
@@ -323,6 +343,11 @@ sudo -i -u "$TARGET_USER" bash <<'EOF'
   echo "[Modding] Mod structures initialized and Remote Monitoring is active."
 EOF
 
+# Ensure all files and directories in /home/$TARGET_USER are owned by TARGET_USER
+# This fixes any permission leaks (e.g. if ficsit-cli was run as root previously)
+log_info "Ensuring correct permissions and ownership under /home/$TARGET_USER..."
+chown -R "$TARGET_USER:$TARGET_USER" "/home/$TARGET_USER"
+
 log_success "Satisfactory directory structures and mod databases provisioned successfully under '/home/$TARGET_USER'."
 
 # ------------------------------------------------------------------------------
@@ -357,6 +382,53 @@ systemctl daemon-reload
 log_success "Registered systemd service: 'satisfactory.service'"
 log_info "To enable the service to auto-start on boot: systemctl enable satisfactory"
 log_info "To start the Satisfactory server immediately: systemctl start satisfactory"
+
+# ------------------------------------------------------------------------------
+# 9b. WEBPANEL AUTOMATED DEPLOYMENT & SERVICE CONFIGURATION
+# ------------------------------------------------------------------------------
+log_info "Configuring and building the Satisfactory Web Control Panel..."
+
+# Detect where this installer script resides (repository root)
+PANEL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+log_info "Detected Web Control Panel directory at: $PANEL_DIR"
+
+if [ -f "$PANEL_DIR/package.json" ]; then
+  log_info "Installing Web Control Panel Node.js packages..."
+  cd "$PANEL_DIR"
+  npm install --no-audit --no-fund
+  
+  log_info "Building production package for Web Control Panel..."
+  npm run build
+  
+  log_info "Writing systemd service unit for the Web Control Panel..."
+  PANEL_SYSTEMD_UNIT="/etc/systemd/system/satisfactory-panel.service"
+  
+  cat <<EOF > "$PANEL_SYSTEMD_UNIT"
+[Unit]
+Description=Satisfactory Web Control Panel
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$PANEL_DIR
+ExecStart=/usr/bin/node dist/server.cjs
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  log_info "Enabling and restarting satisfactory-panel.service..."
+  systemctl daemon-reload
+  systemctl enable satisfactory-panel.service
+  systemctl restart satisfactory-panel.service || log_warning "Failed to restart satisfactory-panel.service immediately. Make sure systemd is active on the host."
+  log_success "Web Control Panel automated setup completed successfully!"
+else
+  log_error "package.json not found in $PANEL_DIR. Skipping automated Web Control Panel systemd service deployment."
+fi
 
 # ------------------------------------------------------------------------------
 # 10. WRAP UP & AUDIT

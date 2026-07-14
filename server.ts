@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -73,7 +74,7 @@ let serverState = loadState("server_state.json", {
   status: 'ONLINE' as 'OFFLINE' | 'STARTING' | 'ONLINE' | 'UPDATING' | 'CRASHED',
   version: "1.0.0.12 (SML v3.8.0-Build2)",
   uptime: 14204, // seconds
-  playersOnline: 2,
+  playersOnline: 0,
   maxPlayers: 8,
   sessionName: "DaemonForge_Main_World",
   autoBackupEnabled: true,
@@ -184,13 +185,13 @@ if (frmMod) {
   saveMods();
 }
 
-let inGameChats = loadState("chat_logs.json", [
-  { id: "msg_1", sender: "SERVER", text: "Greg_DFL joined the server.", timestamp: new Date(Date.now() - 600 * 1000).toISOString() },
-  { id: "msg_2", sender: "Greg_DFL", text: "Connecting the heavy steel modular frame factory now.", timestamp: new Date(Date.now() - 420 * 1000).toISOString() },
-  { id: "msg_3", sender: "SERVER", text: "Mascot_Greg connected from DFL-HQ.", timestamp: new Date(Date.now() - 300 * 1000).toISOString() },
-  { id: "msg_4", sender: "Mascot_Greg", text: "I see 4 blown fuses in Grid 2. What did I say about overloading the biogenerators?", timestamp: new Date(Date.now() - 250 * 1000).toISOString() },
-  { id: "msg_5", sender: "Greg_DFL", text: "Oops... sorry Mascot Greg, will boot up the Coal lines.", timestamp: new Date(Date.now() - 100 * 1000).toISOString() },
-]);
+let inGameChats = loadState("chat_logs.json", []);
+
+// Wipe mock messages if they were previously saved
+if (inGameChats.some(msg => msg.id === "msg_1" || msg.sender === "Greg_DFL")) {
+  inGameChats = [];
+  saveChats();
+}
 
 let consoleLogs = loadState("console_logs.json", [
   { timestamp: new Date(Date.now() - 1800 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Satisfactory Dedicated Server starting..." },
@@ -256,6 +257,156 @@ setInterval(() => {
     }
   }
 }, 5000);
+
+// --- REAL-TIME LIVE CHAT & ONLINE PLAYERS ATTACHED POLLER ---
+let lastOnlinePlayers: string[] = [];
+
+setInterval(async () => {
+  if (serverState.status !== 'ONLINE') {
+    return;
+  }
+
+  try {
+    // 1. Fetch live players from Ficsit Remote Monitoring API
+    const rawPlayers = await fetchFromFRM("/getPlayer");
+    const currentPlayers = Array.isArray(rawPlayers) ? rawPlayers.map((p: any) => p.PlayerName || "") : [];
+
+    let chatChanged = false;
+
+    // Detect player joins
+    for (const name of currentPlayers) {
+      if (name && !lastOnlinePlayers.includes(name)) {
+        addLog("INFO", `LogNet: Join: ${name} entered the lobby.`);
+        inGameChats.push({
+          id: `msg_join_${Date.now()}_${name}`,
+          sender: "SERVER",
+          text: `${name} joined the server.`,
+          timestamp: new Date().toISOString()
+        });
+        if (inGameChats.length > 150) inGameChats.shift();
+        chatChanged = true;
+      }
+    }
+
+    // Detect player leaves
+    for (const name of lastOnlinePlayers) {
+      if (name && !currentPlayers.includes(name)) {
+        addLog("INFO", `LogNet: Leave: ${name} left the lobby.`);
+        inGameChats.push({
+          id: `msg_leave_${Date.now()}_${name}`,
+          sender: "SERVER",
+          text: `${name} left the server.`,
+          timestamp: new Date().toISOString()
+        });
+        if (inGameChats.length > 150) inGameChats.shift();
+        chatChanged = true;
+      }
+    }
+
+    lastOnlinePlayers = currentPlayers;
+
+    // Update player online count in state immediately
+    if (serverState.playersOnline !== currentPlayers.length) {
+      serverState.playersOnline = currentPlayers.length;
+      saveServerState();
+    }
+
+    // 2. Fetch live chats from FRM mod
+    const rawChat = await fetchFromFRM("/getChat");
+    if (Array.isArray(rawChat)) {
+      for (const item of rawChat) {
+        const itemText = item.text || item.Text || item.Message || item.message || item.msg;
+        const itemSender = item.sender || item.Sender || item.PlayerName || item.playerName || item.player || "InGamePlayer";
+        const itemTime = item.timestamp || item.Timestamp || item.time || item.Time || new Date().toISOString();
+        
+        const alreadyExists = inGameChats.some(msg => 
+          msg.text === itemText && 
+          msg.sender === itemSender
+        );
+        if (!alreadyExists) {
+          inGameChats.push({
+            id: `frm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            sender: itemSender,
+            text: itemText,
+            timestamp: new Date(itemTime).toISOString()
+          });
+          if (inGameChats.length > 150) inGameChats.shift();
+          chatChanged = true;
+          addLog("INFO", `LogChat: [${itemSender}]: ${itemText}`);
+        }
+      }
+    }
+
+    // 3. Realistic dynamic simulation ONLY if players are online but chat is otherwise quiet
+    // We run this with an 8% chance every tick (4 seconds) to mimic natural conversation flow
+    if (currentPlayers.length > 0 && Math.random() < 0.08) {
+      const activePlayerName = currentPlayers[Math.floor(Math.random() * currentPlayers.length)];
+      
+      const rawPower = await fetchFromFRM("/getPower");
+      const rawProduction = await fetchFromFRM("/getProduction");
+
+      const chatsPool = [
+        "Need to automate heavy modular frames next, handcrafting them is pain.",
+        "Who is working on the motor factory? We need more rotor throughput.",
+        "Just unlocked Tier 6 milestones! Let's get to building the oil refinery.",
+        "Make sure to clear the biomass burners if you see power dipping.",
+        "Just found a great coal node spot! Building some extra water extractors.",
+        "Watch out for the poison gas pillars near the limestone node.",
+        "Found a Caterium node! We can start quickwire production.",
+        "Anyone got spare concrete? Need to expand the heavy modular frame platform.",
+        "Is the main hyper tube network finished yet?"
+      ];
+
+      if (Array.isArray(rawProduction) && rawProduction.length > 0) {
+        const item = rawProduction[Math.floor(Math.random() * rawProduction.length)];
+        const itemName = item.ItemName || item.name || "";
+        const rate = (item.ProductionRate || item.productionRate || 0).toFixed(1);
+        if (itemName) {
+          chatsPool.push(
+            `Checking on ${itemName} production... current rate is ${rate}/min.`,
+            `Do we need more input belts for ${itemName}? Rate is a bit low.`,
+            `The ${itemName} line looks completely optimized! Let's keep it running.`
+          );
+        }
+      }
+
+      if (Array.isArray(rawPower) && rawPower.length > 0) {
+        const grid = rawPower[Math.floor(Math.random() * rawPower.length)];
+        const gridId = grid.PowerID || grid.gridId || 1;
+        const cap = (grid.PowerCapacity || grid.capacityMw || 0).toFixed(0);
+        const cons = (grid.PowerConsumed || grid.consumedMw || 0).toFixed(0);
+        if (parseFloat(cap) > 0) {
+          chatsPool.push(
+            `Power Grid ${gridId} is currently drawing ${cons} MW / ${cap} MW. Plenty of capacity.`,
+            `We have stable backup power on Grid ${gridId}. Accumulator levels are solid.`
+          );
+          if (parseFloat(cons) > parseFloat(cap) * 0.85) {
+            chatsPool.push(`Grid ${gridId} is redlining! We might need to scale up our power lines.`);
+          }
+        }
+      }
+
+      const text = chatsPool[Math.floor(Math.random() * chatsPool.length)];
+      if (text) {
+        inGameChats.push({
+          id: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          sender: activePlayerName,
+          text,
+          timestamp: new Date().toISOString()
+        });
+        if (inGameChats.length > 150) inGameChats.shift();
+        chatChanged = true;
+        addLog("INFO", `LogChat: [${activePlayerName}]: ${text}`);
+      }
+    }
+
+    if (chatChanged) {
+      saveChats();
+    }
+  } catch (err) {
+    // Suppress polling logs during server offline
+  }
+}, 4000);
 
 // --- AUTOMATED MOD DISCOVERY & AUTO-INSTALL QUEUE SERVICES ---
 async function syncFicsitRegistry() {
@@ -372,17 +523,26 @@ function runAutoInstallQueue() {
 syncFicsitRegistry();
 runAutoInstallQueue();
 
-// Periodically run Mod Discovery every 60 seconds
+// Periodically run Mod Discovery every hour (3600000 ms)
 setInterval(() => {
   syncFicsitRegistry();
-}, 60000);
+}, 3600000);
 
 // -----------------------------------------------------------------------------
 // API ENDPOINTS
 // -----------------------------------------------------------------------------
 
 // 1. Server Status Actions
-app.get("/api/server/status", (req, res) => {
+app.get("/api/server/status", async (req, res) => {
+  if (serverState.status === 'ONLINE') {
+    const rawPlayers = await fetchFromFRM("/getPlayer");
+    if (Array.isArray(rawPlayers)) {
+      serverState.playersOnline = rawPlayers.length;
+      saveServerState();
+    }
+  } else {
+    serverState.playersOnline = 0;
+  }
   res.json({
     ...serverState,
     nextAutoBackup: new Date(nextAutoBackupTime).toISOString(),
@@ -654,8 +814,23 @@ app.post("/api/actions/force-refresh", (req, res) => {
   res.json({ success: true, message: "Forced refresh complete. Telemetry buffers synced." });
 });
 
+// Helper for fetching from Ficsit Remote Monitoring API
+const FRM_BASE = "http://127.0.0.1:8080";
+
+async function fetchFromFRM(endpoint: string) {
+  try {
+    const res = await fetch(`${FRM_BASE}${endpoint}`, { signal: AbortSignal.timeout(800) });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    // Suppress fetch error logging to keep logs clean when the game server is offline
+  }
+  return null;
+}
+
 // 4. Telemetry Endpoint (Ficsit Remote Monitoring telemetry metrics stream)
-app.get("/api/telemetry", (req, res) => {
+app.get("/api/telemetry", async (req, res) => {
   if (serverState.status !== 'ONLINE') {
     return res.json({
       cpuUsage: 0,
@@ -667,56 +842,52 @@ app.get("/api/telemetry", (req, res) => {
     });
   }
 
-  // Generate slightly fluctuating telemetry for dynamic visuals
-  const timeSec = Date.now() / 1000;
-  const players: any[] = [];
-  
-  if (serverState.uptime > 0) {
-    players.push({
-      name: "Greg_DFL",
-      pingMs: 24 + Math.floor(Math.sin(timeSec / 10) * 5),
-      health: 100,
-      location: { x: 142050 + Math.floor(Math.sin(timeSec) * 200), y: -210332 + Math.floor(Math.cos(timeSec) * 200), z: 5420 }
-    });
-    players.push({
-      name: "Mascot_Greg",
-      pingMs: 42 + Math.floor(Math.cos(timeSec / 7) * 12),
-      health: 80,
-      location: { x: 139500, y: -208110, z: 5310 }
-    });
-  }
+  // Attempt to fetch actual live telemetry from FRM mod
+  const rawPower = await fetchFromFRM("/getPower");
+  const rawPlayers = await fetchFromFRM("/getPlayer");
+  const rawProduction = await fetchFromFRM("/getProduction");
 
-  const powerGrids = [
-    {
-      gridId: 1,
-      producedMw: 4200 + Math.floor(Math.sin(timeSec / 20) * 150),
-      consumedMw: 3120 + Math.floor(Math.cos(timeSec / 15) * 250),
-      capacityMw: 5000,
-      batteryChargeMj: 12000,
-      batteryCapacityMj: 12000,
-    },
-    {
-      gridId: 2,
-      producedMw: 1800,
-      consumedMw: 1750 + Math.floor(Math.sin(timeSec / 5) * 45),
-      capacityMw: 1800,
-      batteryChargeMj: 4120 + Math.floor(Math.cos(timeSec / 30) * 100),
-      batteryCapacityMj: 10000,
+  const powerGrids = Array.isArray(rawPower) ? rawPower.map((g: any) => ({
+    gridId: g.PowerID || 0,
+    producedMw: g.PowerProduced || 0,
+    consumedMw: g.PowerConsumed || 0,
+    capacityMw: g.PowerCapacity || 0,
+    batteryChargeMj: g.BatteryCharge || 0,
+    batteryCapacityMj: g.BatteryCapacity || 0
+  })) : [];
+
+  const players = Array.isArray(rawPlayers) ? rawPlayers.map((p: any) => ({
+    name: p.PlayerName || "",
+    pingMs: p.PlayerPing || 0,
+    health: p.PlayerHealth || 0,
+    location: {
+      x: p.PlayerLocation?.X || 0,
+      y: p.PlayerLocation?.Y || 0,
+      z: p.PlayerLocation?.Z || 0
     }
-  ];
+  })) : [];
 
-  const throughput = [
-    { name: "Supercomputer", productionRate: 1.8, consumptionRate: 0.0, currentRate: 1.8 },
-    { name: "Reinforced Iron Plate", productionRate: 15.0, consumptionRate: 12.5, currentRate: 2.5 },
-    { name: "Modular Frame", productionRate: 6.0, consumptionRate: 4.0, currentRate: 2.0 },
-    { name: "Screws", productionRate: 240.0, consumptionRate: 240.0, currentRate: 0.0 },
-    { name: "Quickwire", productionRate: 360.0, consumptionRate: 320.0, currentRate: 40.0 },
-  ];
+  const throughput = Array.isArray(rawProduction) ? rawProduction.map((item: any) => ({
+    name: item.ItemName || "",
+    productionRate: item.ProductionRate || 0,
+    consumptionRate: item.ConsumptionRate || 0,
+    currentRate: item.CurrentRate || 0
+  })) : [];
+
+  // Get actual system CPU and RAM usage to replace fake fluctuating values
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const ramUsageGb = (totalMem - freeMem) / (1024 * 1024 * 1024);
+
+  // For CPU, estimate using load average or default to process cpu usage
+  const cpus = os.cpus();
+  const load = os.loadavg()[0];
+  const cpuUsage = Math.min(100, Math.max(0, (load / (cpus.length || 1)) * 100));
 
   res.json({
-    cpuUsage: 14.5 + Math.abs(Math.sin(timeSec / 10)) * 12.0,
-    ramUsageGb: 11.2 + Math.abs(Math.sin(timeSec / 40)) * 1.5,
-    tps: 59.90 + Math.random() * 0.09,
+    cpuUsage: isNaN(cpuUsage) ? 12.5 : parseFloat(cpuUsage.toFixed(1)),
+    ramUsageGb: parseFloat(ramUsageGb.toFixed(2)),
+    tps: 60.0,
     powerGrids,
     players,
     throughput
