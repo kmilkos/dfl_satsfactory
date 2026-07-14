@@ -1,195 +1,5 @@
 [
   {
-    "timestamp": "2026-07-14T13:40:25.968Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:40:26.126Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:41:25.969Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:41:26.140Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:42:25.970Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:42:26.130Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:43:25.970Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:43:26.130Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:44:25.970Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:44:26.126Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:45:25.971Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:45:26.132Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:46:25.972Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:46:26.173Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:47:25.973Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:47:26.197Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:48:25.974Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:48:26.129Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:49:25.974Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:49:26.173Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:50:25.974Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:50:26.133Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:51:25.976Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:51:26.131Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:52:25.977Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:52:26.090Z",
-    "level": "INFO",
-    "message": "LogDaemonForge: Automated backup triggered. Saved slot 'DaemonForge_Main_World' into file 'ServerSave_DaemonForge_v3_Auto_3.sav' (13.86 MB)."
-  },
-  {
-    "timestamp": "2026-07-14T13:52:26.138Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:53:25.978Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:53:26.149Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:54:25.979Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:54:26.134Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:55:25.979Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:55:26.135Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:56:25.979Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:56:26.138Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:57:25.980Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
-    "timestamp": "2026-07-14T13:57:26.137Z",
-    "level": "WARNING",
-    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
-  },
-  {
-    "timestamp": "2026-07-14T13:58:25.980Z",
-    "level": "INFO",
-    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
-  },
-  {
     "timestamp": "2026-07-14T13:58:26.143Z",
     "level": "WARNING",
     "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
@@ -998,5 +808,195 @@
     "timestamp": "2026-07-14T15:08:45.262Z",
     "level": "INFO",
     "message": "LogChat: [Greg_DFL]: Need to automate heavy modular frames next, handcrafting them is pain."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:00.270Z",
+    "level": "INFO",
+    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:00.279Z",
+    "level": "INFO",
+    "message": "LogModding: Running SML Auto-Install Queue verification..."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:00.280Z",
+    "level": "INFO",
+    "message": "LogModding: Auto-Install queue verification complete. All queued packages are already loaded."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:00.670Z",
+    "level": "WARNING",
+    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:04.280Z",
+    "level": "INFO",
+    "message": "LogNet: Join: Greg_DFL entered the lobby."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:04.281Z",
+    "level": "INFO",
+    "message": "LogNet: Join: Becky_FICSIT entered the lobby."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:04.281Z",
+    "level": "INFO",
+    "message": "LogNet: Join: FICSIT_Pioneer entered the lobby."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:12.294Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:09:36.293Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:13:12.332Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Make sure to clear the biomass burners if you see power dipping."
+  },
+  {
+    "timestamp": "2026-07-14T15:14:40.348Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Who is working on the motor factory? We need more rotor throughput."
+  },
+  {
+    "timestamp": "2026-07-14T15:15:00.358Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Make sure to clear the biomass burners if you see power dipping."
+  },
+  {
+    "timestamp": "2026-07-14T15:16:28.368Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Anyone got spare concrete? Need to expand the heavy modular frame platform."
+  },
+  {
+    "timestamp": "2026-07-14T15:17:36.379Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Is the main hyper tube network finished yet?"
+  },
+  {
+    "timestamp": "2026-07-14T15:18:40.403Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Just found a great coal node spot! Building some extra water extractors."
+  },
+  {
+    "timestamp": "2026-07-14T15:18:52.391Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Is the main hyper tube network finished yet?"
+  },
+  {
+    "timestamp": "2026-07-14T15:19:28.397Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:20:56.423Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Who is working on the motor factory? We need more rotor throughput."
+  },
+  {
+    "timestamp": "2026-07-14T15:21:20.421Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:21:28.422Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Who is working on the motor factory? We need more rotor throughput."
+  },
+  {
+    "timestamp": "2026-07-14T15:21:36.423Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:23:16.451Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Who is working on the motor factory? We need more rotor throughput."
+  },
+  {
+    "timestamp": "2026-07-14T15:23:20.448Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Make sure to clear the biomass burners if you see power dipping."
+  },
+  {
+    "timestamp": "2026-07-14T15:23:52.454Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Anyone got spare concrete? Need to expand the heavy modular frame platform."
+  },
+  {
+    "timestamp": "2026-07-14T15:23:56.456Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Is the main hyper tube network finished yet?"
+  },
+  {
+    "timestamp": "2026-07-14T15:24:00.403Z",
+    "level": "INFO",
+    "message": "LogDaemonForge: Automated backup triggered. Saved slot 'DaemonForge_Main_World' into file 'ServerSave_DaemonForge_v3_Auto_5.sav' (13.88 MB)."
+  },
+  {
+    "timestamp": "2026-07-14T15:24:28.462Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Anyone got spare concrete? Need to expand the heavy modular frame platform."
+  },
+  {
+    "timestamp": "2026-07-14T15:24:40.462Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Found a Caterium node! We can start quickwire production."
+  },
+  {
+    "timestamp": "2026-07-14T15:25:08.468Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Need to automate heavy modular frames next, handcrafting them is pain."
+  },
+  {
+    "timestamp": "2026-07-14T15:26:20.489Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Who is working on the motor factory? We need more rotor throughput."
+  },
+  {
+    "timestamp": "2026-07-14T15:27:04.507Z",
+    "level": "INFO",
+    "message": "LogChat: [FICSIT_Pioneer]: Watch out for the poison gas pillars near the limestone node."
+  },
+  {
+    "timestamp": "2026-07-14T15:27:28.503Z",
+    "level": "INFO",
+    "message": "LogChat: [Becky_FICSIT]: Is the main hyper tube network finished yet?"
+  },
+  {
+    "timestamp": "2026-07-14T15:30:12.531Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Just unlocked Tier 6 milestones! Let's get to building the oil refinery."
+  },
+  {
+    "timestamp": "2026-07-14T15:31:56.552Z",
+    "level": "INFO",
+    "message": "LogChat: [Greg_DFL]: Just found a great coal node spot! Building some extra water extractors."
+  },
+  {
+    "timestamp": "2026-07-14T15:32:58.315Z",
+    "level": "INFO",
+    "message": "LogModding: Mod Discovery task starting. Fetching live registry updates from Ficsit.app..."
+  },
+  {
+    "timestamp": "2026-07-14T15:32:58.325Z",
+    "level": "INFO",
+    "message": "LogModding: Running SML Auto-Install Queue verification..."
+  },
+  {
+    "timestamp": "2026-07-14T15:32:58.326Z",
+    "level": "INFO",
+    "message": "LogModding: Auto-Install queue verification complete. All queued packages are already loaded."
+  },
+  {
+    "timestamp": "2026-07-14T15:32:58.638Z",
+    "level": "WARNING",
+    "message": "LogModding: Mod Discovery live sync query failed (Ficsit.app API returned HTTP 422). Using local fallback metadata cache."
   }
 ]
