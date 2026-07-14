@@ -182,37 +182,57 @@ else
   log_warning "Failed to locate dynamic ficsit-cli download URL."
   echo -e "\n${YELLOW}======================================================================${NC}"
   echo -e " ${RED}[WARNING] Unable to resolve latest ficsit-cli release dynamically.${NC}"
-  echo -e " Please visit the manual download page to grab the archive file URL:"
+  echo -e " Please visit the manual download page to grab the Linux package URL:"
   echo -e "   ${GREEN}https://github.com/satisfactorymodding/ficsit-cli/releases${NC}"
-  echo -e " Copy the link to the Linux package (usually named ${CYAN}ficsit-cli-linux-amd64.tar.gz${NC} or similar zip)."
+  echo -e " Copy the link to the Linux package (e.g., .deb, .tar.gz, or .zip file)."
   echo -e "${YELLOW}======================================================================${NC}\n"
   
-  # Allow the user to paste the direct archive URL manually
-  read -p "Please enter the URL of the ficsit-cli archive (or press ENTER to use the static fallback): " USER_FICSIT_URL
+  # Allow the user to paste the direct package URL manually
+  read -p "Please enter the URL of the ficsit-cli package (or press ENTER to use the static fallback): " USER_FICSIT_URL
   
   if [ -n "$USER_FICSIT_URL" ]; then
     log_info "Downloading user-specified ficsit-cli from: $USER_FICSIT_URL"
-    wget -qO /tmp/ficsit-cli-user.archive "$USER_FICSIT_URL"
-    mkdir -p /tmp/ficsit-extracted
+    wget -qO /tmp/ficsit-cli-user.package "$USER_FICSIT_URL"
     
-    # Handle ZIP vs TAR.GZ extraction
-    if [[ "$USER_FICSIT_URL" == *.zip ]]; then
-      apt-get install -y unzip >/dev/null 2>&1 || true
-      unzip -q -o /tmp/ficsit-cli-user.archive -d /tmp/ficsit-extracted
+    # Smart type detection
+    if [[ "$USER_FICSIT_URL" == *.deb* ]] || dpkg -I /tmp/ficsit-cli-user.package >/dev/null 2>&1; then
+      log_info "Detected Debian package. Installing via dpkg..."
+      dpkg -i /tmp/ficsit-cli-user.package || apt-get install -y -f || true
+      
+      # Ensure it's globally available at /usr/local/bin/ficsit-cli
+      if [ -f /usr/bin/ficsit-cli ] && [ ! -f /usr/local/bin/ficsit-cli ]; then
+        ln -sf /usr/bin/ficsit-cli /usr/local/bin/ficsit-cli
+      fi
+      
+      if [ -f /usr/local/bin/ficsit-cli ]; then
+        log_success "Successfully installed ficsit-cli from .deb package!"
+      else
+        log_error "Failed to verify ficsit-cli installation after dpkg install."
+      fi
+      rm -f /tmp/ficsit-cli-user.package
     else
-      tar -xzf /tmp/ficsit-cli-user.archive -C /tmp/ficsit-extracted || unzip -q -o /tmp/ficsit-cli-user.archive -d /tmp/ficsit-extracted || true
+      log_info "Detected archive package. Extracting..."
+      mkdir -p /tmp/ficsit-extracted
+      
+      # Handle ZIP vs TAR.GZ extraction
+      if [[ "$USER_FICSIT_URL" == *.zip ]]; then
+        apt-get install -y unzip >/dev/null 2>&1 || true
+        unzip -q -o /tmp/ficsit-cli-user.package -d /tmp/ficsit-extracted
+      else
+        tar -xzf /tmp/ficsit-cli-user.package -C /tmp/ficsit-extracted || unzip -q -o /tmp/ficsit-cli-user.package -d /tmp/ficsit-extracted || true
+      fi
+      
+      # Robustly find binary inside archive
+      BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" | head -n 1)
+      if [ -n "$BINARY_PATH" ]; then
+        mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
+        chmod +x /usr/local/bin/ficsit-cli
+        log_success "Successfully installed ficsit-cli from user-specified package!"
+      else
+        log_error "Could not find 'ficsit-cli' executable inside the extracted archive."
+      fi
+      rm -rf /tmp/ficsit-cli-user.package /tmp/ficsit-extracted
     fi
-    
-    # Robustly find binary
-    BINARY_PATH=$(find /tmp/ficsit-extracted -type f -name "ficsit-cli" | head -n 1)
-    if [ -n "$BINARY_PATH" ]; then
-      mv "$BINARY_PATH" /usr/local/bin/ficsit-cli
-      chmod +x /usr/local/bin/ficsit-cli
-      log_success "Successfully installed ficsit-cli from user-specified package!"
-    else
-      log_error "Could not find 'ficsit-cli' executable inside the extracted archive."
-    fi
-    rm -rf /tmp/ficsit-cli-user.archive /tmp/ficsit-extracted
   fi
   
   # Fallback check if manual entry wasn't successful or skipped
