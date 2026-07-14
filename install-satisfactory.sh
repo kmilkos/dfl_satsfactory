@@ -103,6 +103,26 @@ log_success "Node.js $(node -v) / npm $(npm -v) installed successfully."
 # ------------------------------------------------------------------------------
 log_info "Configuring SteamCMD integration requirements..."
 
+# Enable contrib and non-free components (required on Debian/Ubuntu for steamcmd)
+if [ -f /etc/apt/sources.list ]; then
+    log_info "Enabling contrib and non-free components in /etc/apt/sources.list..."
+    if ! grep -q "contrib" /etc/apt/sources.list; then
+        sed -i 's/\bmain\b/main contrib non-free/g' /etc/apt/sources.list
+    fi
+fi
+if [ -f /etc/apt/sources.list.d/debian.sources ]; then
+    log_info "Enabling contrib and non-free components in /etc/apt/sources.list.d/debian.sources..."
+    if ! grep -q "contrib" /etc/apt/sources.list.d/debian.sources; then
+        sed -i 's/Components: main/Components: main contrib non-free/g' /etc/apt/sources.list.d/debian.sources
+    fi
+fi
+for f in /etc/apt/sources.list.d/*.list; do
+    if [ -f "$f" ] && ! grep -q "contrib" "$f" && [[ "$f" != *"github"* && "$f" != *"nodesource"* ]]; then
+        log_info "Enabling contrib and non-free in $f..."
+        sed -i 's/\bmain\b/main contrib non-free/g' "$f"
+    fi
+done
+
 # Enable Multiarch support for 32-bit architecture
 dpkg --add-architecture i386
 apt-get update -y
