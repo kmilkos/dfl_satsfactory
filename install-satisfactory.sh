@@ -50,6 +50,7 @@ fi
 
 # Configure Passwordless Sudo for the Satisfactory user (optional, for convenience)
 log_info "Configuring sudo privileges for '$TARGET_USER'..."
+mkdir -p /etc/sudoers.d
 echo "$TARGET_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$TARGET_USER"
 chmod 0440 "/etc/sudoers.d/$TARGET_USER"
 
