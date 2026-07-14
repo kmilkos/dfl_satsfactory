@@ -128,8 +128,8 @@ let mods = loadState("mods.json", [
     author: "Raffi",
     description: "Adds custom wind turbines, water turbines, modular coal power plants, and solar arrays for cleaner grids.",
     downloads: 384021,
-    installed: true,
-    enabled: true,
+    installed: false,
+    enabled: false,
     dependencies: ["SML"],
   },
   {
@@ -161,8 +161,8 @@ let mods = loadState("mods.json", [
     author: "Gniuz",
     description: "Copy, paste, dismantle, or fill huge factory areas with visual area highlights. Essential for megastructures.",
     downloads: 254112,
-    installed: true,
-    enabled: true,
+    installed: false,
+    enabled: false,
     dependencies: ["SML"],
   }
 ]);
@@ -193,19 +193,52 @@ if (inGameChats.some(msg => msg.id === "msg_1" || msg.sender === "Greg_DFL")) {
   saveChats();
 }
 
-let consoleLogs = loadState("console_logs.json", [
-  { timestamp: new Date(Date.now() - 1800 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Satisfactory Dedicated Server starting..." },
-  { timestamp: new Date(Date.now() - 1795 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: SML SMLv3.8.0-Build2 found in SML directory." },
-  { timestamp: new Date(Date.now() - 1790 * 1000).toISOString(), level: "INFO", message: "LogModding: Display: Loading mod 'FicsitRemoteMonitoring' v2.4.1..." },
-  { timestamp: new Date(Date.now() - 1789 * 1000).toISOString(), level: "INFO", message: "LogModding: Display: Loading mod 'RefinedPower' v3.2.0..." },
-  { timestamp: new Date(Date.now() - 1788 * 1000).toISOString(), level: "INFO", message: "LogModding: Display: Loading mod 'AreaActions' v2.1.3..." },
-  { timestamp: new Date(Date.now() - 1780 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Loading save game 'ServerSave_DaemonForge_v3'..." },
-  { timestamp: new Date(Date.now() - 1775 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777." },
-  { timestamp: new Date(Date.now() - 1770 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." },
-  { timestamp: new Date(Date.now() - 600 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Greg_DFL entered the lobby (SteamID: 76561198000000000)." },
-  { timestamp: new Date(Date.now() - 300 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Mascot_Greg entered the lobby (SteamID: 76561198011223344)." },
-  { timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), level: "INFO", message: "LogDaemonForge: Display: Automated backup system created 'ServerSave_DaemonForge_v3_Auto_1.sav' successfully." }
-]);
+// Dynamically construct initial console logs based on loaded mods
+const buildInitialConsoleLogs = () => {
+  const startupLogs = [
+    { timestamp: new Date(Date.now() - 1800 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Satisfactory Dedicated Server starting..." },
+    { timestamp: new Date(Date.now() - 1795 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: SML SMLv3.8.0-Build2 found in SML directory." }
+  ];
+
+  mods.forEach((mod, idx) => {
+    if (mod.installed && mod.enabled) {
+      startupLogs.push({
+        timestamp: new Date(Date.now() - (1790 - idx) * 1000).toISOString(),
+        level: "INFO",
+        message: `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...`
+      });
+    }
+  });
+
+  startupLogs.push(
+    { timestamp: new Date(Date.now() - 1780 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Loading save game 'ServerSave_DaemonForge_v3'..." },
+    { timestamp: new Date(Date.now() - 1775 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777." },
+    { timestamp: new Date(Date.now() - 1770 * 1000).toISOString(), level: "INFO", message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." },
+    { timestamp: new Date(Date.now() - 600 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Greg_DFL entered the lobby (SteamID: 76561198000000000)." },
+    { timestamp: new Date(Date.now() - 300 * 1000).toISOString(), level: "INFO", message: "LogNet: Join: Mascot_Greg entered the lobby (SteamID: 76561198011223344)." },
+    { timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), level: "INFO", message: "LogDaemonForge: Display: Automated backup system created 'ServerSave_DaemonForge_v3_Auto_1.sav' successfully." }
+  );
+
+  return startupLogs;
+};
+
+let consoleLogs = loadState("console_logs.json", []);
+if (consoleLogs.length === 0) {
+  consoleLogs = buildInitialConsoleLogs();
+  saveConsoleLogs();
+} else {
+  // If console_logs.json exists, sanitize and remove stale or uninstalled "Loading mod" messages
+  const installedModIds = new Set(mods.filter(m => m.installed && m.enabled).map(m => m.id));
+  consoleLogs = consoleLogs.filter(log => {
+    const match = log.message.match(/LogModding: Display: Loading mod '([^']+)'/);
+    if (match) {
+      const modId = match[1];
+      return installedModIds.has(modId);
+    }
+    return true;
+  });
+  saveConsoleLogs();
+}
 
 // Helper to push logs dynamically
 function addLog(level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string) {
@@ -685,7 +718,7 @@ app.get("/api/mods", (req, res) => {
   res.json(mods);
 });
 
-app.post("/api/mods/install", (req, res) => {
+app.post("/api/mods/install", async (req, res) => {
   const { id } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -695,12 +728,13 @@ app.post("/api/mods/install", (req, res) => {
   addLog("COMMAND", `ficsit-cli execute: install "${id}"`);
   addLog("INFO", `ficsit-cli: Fetching mod package metadata for '${id}'...`);
 
-  setTimeout(() => {
-    mod.installed = true;
-    mod.enabled = true;
-    saveMods();
-    addLog("INFO", `ficsit-cli: SML verified. Successfully extracted '${mod.name}' v${mod.version} to /Mods folder.`);
-  }, 2000);
+  // Wait 2 seconds to simulate ficsit-cli download, validation, and extraction
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  mod.installed = true;
+  mod.enabled = true;
+  saveMods();
+  addLog("INFO", `ficsit-cli: SML verified. Successfully extracted '${mod.name}' v${mod.version} to /Mods folder.`);
 
   res.json({ success: true, mod });
 });

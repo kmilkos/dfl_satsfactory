@@ -5,7 +5,7 @@
     "version": "2.4.1",
     "author": "Panat",
     "description": "Exposes real-time telemetry, power grid stats, player coordination and world inventory statistics via REST & WebSockets.",
-    "downloads": 143659,
+    "downloads": 143731,
     "installed": true,
     "enabled": true,
     "dependencies": [
@@ -18,9 +18,9 @@
     "version": "3.2.0",
     "author": "Raffi",
     "description": "Adds custom wind turbines, water turbines, modular coal power plants, and solar arrays for cleaner grids.",
-    "downloads": 385442,
-    "installed": true,
-    "enabled": true,
+    "downloads": 385526,
+    "installed": false,
+    "enabled": false,
     "dependencies": [
       "SML"
     ]
@@ -31,7 +31,7 @@
     "version": "18.3.1",
     "author": "Eisbaer",
     "description": "The ultimate building enhancer. Easily place multiple foundations, splitters, merges, walls, and belts in a single sweep.",
-    "downloads": 513333,
+    "downloads": 513408,
     "installed": false,
     "enabled": false,
     "dependencies": [
@@ -44,7 +44,7 @@
     "version": "1.1.2",
     "author": "Grizzly",
     "description": "Adds customized, automated elevators, cargo lifts, and extendable transport pistons.",
-    "downloads": 99560,
+    "downloads": 99654,
     "installed": false,
     "enabled": false,
     "dependencies": [
@@ -57,9 +57,9 @@
     "version": "2.1.3",
     "author": "Gniuz",
     "description": "Copy, paste, dismantle, or fill huge factory areas with visual area highlights. Essential for megastructures.",
-    "downloads": 255452,
-    "installed": true,
-    "enabled": true,
+    "downloads": 255527,
+    "installed": false,
+    "enabled": false,
     "dependencies": [
       "SML"
     ]
