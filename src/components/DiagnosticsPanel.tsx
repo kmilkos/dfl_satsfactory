@@ -5,7 +5,7 @@ import {
   Layers, Box, TrendingUp, Gauge, Users
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { ConsoleLogLine, TelemetryData, ChatMessage, TelemetryHistoryPoint } from "../types";
+import { ConsoleLogLine, TelemetryData, ChatMessage, TelemetryHistoryPoint, ItemThroughput } from "../types";
 
 // Custom elegant dark tooltip for the telemetry charts
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -58,6 +58,9 @@ export default function DiagnosticsPanel({
 
   // In-game manager chat message input
   const [chatInput, setChatInput] = useState("");
+
+  // Selected production item for details modal
+  const [selectedProduction, setSelectedProduction] = useState<ItemThroughput | null>(null);
 
   // Scroll chat container to bottom on changes
   useEffect(() => {
@@ -289,19 +292,22 @@ export default function DiagnosticsPanel({
                   const netRate = item.currentRate;
                   const isPositive = netRate > 0;
                   const isNeutral = netRate === 0;
-                  const percentOfProdUsed = item.productionRate > 0 ? (item.consumptionRate / item.productionRate) * 100 : 0;
                   
                   return (
-                    <div key={item.name} className="bg-zinc-950/60 border border-slate-800/80 rounded-lg p-3.5 space-y-3 relative overflow-hidden group hover:border-orange-500/30 transition-all duration-300">
-                      {/* Background grid accent */}
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/1 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none"></div>
+                    <div 
+                      key={item.name} 
+                      onClick={() => setSelectedProduction(item)}
+                      className="bg-zinc-950/60 border border-slate-800/85 rounded-lg p-3 relative overflow-hidden group hover:border-orange-500/50 hover:bg-zinc-950/90 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                    >
+                      {/* Background accent */}
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/1 rounded-full blur-xl -mr-6 -mt-6 pointer-events-none"></div>
 
-                      {/* Header info */}
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs font-mono font-bold text-slate-200 uppercase truncate" title={item.name}>
+                      {/* Header: Name & Badge */}
+                      <div className="flex justify-between items-center gap-1.5">
+                        <span className="text-[11px] font-mono font-bold text-slate-200 uppercase truncate" title={item.name}>
                           {item.name}
                         </span>
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 ${
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold border shrink-0 ${
                           isPositive 
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
                             : isNeutral
@@ -312,46 +318,14 @@ export default function DiagnosticsPanel({
                         </span>
                       </div>
 
-                      {/* Net Flow rate large indicator */}
-                      <div className="flex items-baseline space-x-1.5 justify-start">
-                        <span className={`text-xl font-bold font-mono tracking-tight ${
+                      {/* Rate block */}
+                      <div className="flex items-baseline space-x-1 justify-start mt-2">
+                        <span className={`text-base font-bold font-mono tracking-tight ${
                           isPositive ? "text-emerald-400" : isNeutral ? "text-slate-400" : "text-rose-400"
                         }`}>
-                          {isPositive ? "+" : ""}{netRate.toFixed(1)}
+                          {isPositive ? "+" : ""}{netRate.toFixed(2)}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-bold font-mono uppercase">parts/min</span>
-                      </div>
-
-                      {/* Micro bar showing consumption vs production ratio */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] font-mono text-slate-500">
-                          <span>BELT CONGESTION</span>
-                          <span>{percentOfProdUsed.toFixed(0)}% CONSUMED</span>
-                        </div>
-                        <div className="w-full bg-zinc-950 border border-slate-900 h-1.5 rounded overflow-hidden relative">
-                          <div 
-                            className={`h-full transition-all duration-1000 ${
-                              percentOfProdUsed > 90 
-                                ? "bg-rose-500" 
-                                : percentOfProdUsed > 60 
-                                  ? "bg-amber-500" 
-                                  : "bg-emerald-500"
-                            }`}
-                            style={{ width: `${Math.min(100, percentOfProdUsed)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Precise values footer */}
-                      <div className="grid grid-cols-2 gap-2 text-[9px] font-mono border-t border-slate-900/60 pt-2 text-slate-500">
-                        <div>
-                          <span>PROD RATE</span>
-                          <span className="block text-[10px] text-emerald-400 font-bold">+{item.productionRate.toFixed(1)}/m</span>
-                        </div>
-                        <div className="text-right">
-                          <span>CONS RATE</span>
-                          <span className="block text-[10px] text-rose-400 font-bold">-{item.consumptionRate.toFixed(1)}/m</span>
-                        </div>
+                        <span className="text-[9px] text-slate-500 font-bold font-mono lowercase">parts.min.</span>
                       </div>
                     </div>
                   );
@@ -566,6 +540,98 @@ export default function DiagnosticsPanel({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* Modal Popup for Production Details */}
+      {selectedProduction && (
+        <div 
+          className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in"
+          onClick={() => setSelectedProduction(null)}
+        >
+          <div 
+            className="bg-zinc-900 border border-slate-800 rounded-lg p-6 max-w-sm w-full space-y-4 shadow-2xl relative text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header / Title */}
+            <div className="flex justify-between items-start gap-4 border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Material Item</span>
+                <h3 className="text-sm font-mono font-bold text-slate-200 uppercase truncate">
+                  {selectedProduction.name}
+                </h3>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold border shrink-0 ${
+                selectedProduction.currentRate > 0 
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                  : selectedProduction.currentRate === 0
+                    ? "bg-slate-800/20 text-slate-400 border-slate-800"
+                    : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+              }`}>
+                {selectedProduction.currentRate > 0 ? "SURPLUS" : selectedProduction.currentRate === 0 ? "BALANCED" : "DEFICIT"}
+              </span>
+            </div>
+
+            {/* Main Stats Details */}
+            <div className="space-y-3.5 py-1">
+              <div className="flex justify-between items-center bg-zinc-950/40 p-2.5 rounded border border-slate-900/60">
+                <span className="text-[10px] font-mono text-slate-400 uppercase">Net Flow Rate</span>
+                <span className={`text-base font-bold font-mono ${
+                  selectedProduction.currentRate > 0 ? "text-emerald-400" : selectedProduction.currentRate === 0 ? "text-slate-400" : "text-rose-400"
+                }`}>
+                  {selectedProduction.currentRate > 0 ? "+" : ""}{selectedProduction.currentRate.toFixed(2)} <span className="text-[10px] text-slate-500">parts.min.</span>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-zinc-950/40 p-2 border border-slate-900/60 rounded">
+                  <span className="text-[9px] font-mono text-slate-500 block uppercase">Production</span>
+                  <span className="text-xs font-mono font-bold text-emerald-400">+{selectedProduction.productionRate.toFixed(2)}/m</span>
+                </div>
+                <div className="bg-zinc-950/40 p-2 border border-slate-900/60 rounded">
+                  <span className="text-[9px] font-mono text-slate-500 block uppercase">Consumption</span>
+                  <span className="text-xs font-mono font-bold text-rose-400">-{selectedProduction.consumptionRate.toFixed(2)}/m</span>
+                </div>
+              </div>
+
+              {/* Belt Congestion Meter */}
+              {(() => {
+                const percentOfProdUsed = selectedProduction.productionRate > 0 
+                  ? (selectedProduction.consumptionRate / selectedProduction.productionRate) * 100 
+                  : 0;
+                return (
+                  <div className="space-y-1.5 bg-zinc-950/40 p-2.5 border border-slate-900/60 rounded">
+                    <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                      <span>CONVEYOR BELT CONGESTION</span>
+                      <span className="font-bold text-slate-300">{percentOfProdUsed.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-zinc-950 border border-slate-900 h-2 rounded overflow-hidden relative">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          percentOfProdUsed > 90 
+                            ? "bg-rose-500" 
+                            : percentOfProdUsed > 60 
+                              ? "bg-amber-500" 
+                              : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${Math.min(100, percentOfProdUsed)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer / Close Button */}
+            <div className="flex justify-end pt-3 border-t border-slate-850">
+              <button
+                onClick={() => setSelectedProduction(null)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-bold rounded uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Close Detail Matrix
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
