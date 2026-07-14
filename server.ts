@@ -385,69 +385,6 @@ setInterval(async () => {
       }
     }
 
-    // 3. Realistic dynamic simulation ONLY if players are online but chat is otherwise quiet
-    // We run this with an 8% chance every tick (4 seconds) to mimic natural conversation flow
-    if (currentPlayers.length > 0 && Math.random() < 0.08) {
-      const activePlayerName = currentPlayers[Math.floor(Math.random() * currentPlayers.length)];
-      
-      const rawPower = await fetchFromFRM("/getPower");
-      const rawProduction = await fetchFromFRM("/getProduction");
-
-      const chatsPool = [
-        "Need to automate heavy modular frames next, handcrafting them is pain.",
-        "Who is working on the motor factory? We need more rotor throughput.",
-        "Just unlocked Tier 6 milestones! Let's get to building the oil refinery.",
-        "Make sure to clear the biomass burners if you see power dipping.",
-        "Just found a great coal node spot! Building some extra water extractors.",
-        "Watch out for the poison gas pillars near the limestone node.",
-        "Found a Caterium node! We can start quickwire production.",
-        "Anyone got spare concrete? Need to expand the heavy modular frame platform.",
-        "Is the main hyper tube network finished yet?"
-      ];
-
-      if (Array.isArray(rawProduction) && rawProduction.length > 0) {
-        const item = rawProduction[Math.floor(Math.random() * rawProduction.length)];
-        const itemName = item.ItemName || item.name || "";
-        const rate = (item.ProductionRate || item.productionRate || 0).toFixed(1);
-        if (itemName) {
-          chatsPool.push(
-            `Checking on ${itemName} production... current rate is ${rate}/min.`,
-            `Do we need more input belts for ${itemName}? Rate is a bit low.`,
-            `The ${itemName} line looks completely optimized! Let's keep it running.`
-          );
-        }
-      }
-
-      if (Array.isArray(rawPower) && rawPower.length > 0) {
-        const grid = rawPower[Math.floor(Math.random() * rawPower.length)];
-        const gridId = grid.PowerID || grid.gridId || 1;
-        const cap = (grid.PowerCapacity || grid.capacityMw || 0).toFixed(0);
-        const cons = (grid.PowerConsumed || grid.consumedMw || 0).toFixed(0);
-        if (parseFloat(cap) > 0) {
-          chatsPool.push(
-            `Power Grid ${gridId} is currently drawing ${cons} MW / ${cap} MW. Plenty of capacity.`,
-            `We have stable backup power on Grid ${gridId}. Accumulator levels are solid.`
-          );
-          if (parseFloat(cons) > parseFloat(cap) * 0.85) {
-            chatsPool.push(`Grid ${gridId} is redlining! We might need to scale up our power lines.`);
-          }
-        }
-      }
-
-      const text = chatsPool[Math.floor(Math.random() * chatsPool.length)];
-      if (text) {
-        inGameChats.push({
-          id: `sim_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-          sender: activePlayerName,
-          text,
-          timestamp: new Date().toISOString()
-        });
-        if (inGameChats.length > 150) inGameChats.shift();
-        chatChanged = true;
-        addLog("INFO", `LogChat: [${activePlayerName}]: ${text}`);
-      }
-    }
-
     if (chatChanged) {
       saveChats();
     }
@@ -657,7 +594,6 @@ const getStartLogs = () => {
   }
 
   list.push(
-    { level: 'INFO', message: "LogInit: Selected Device: AMD Radeon PRO V620" },
     { level: 'INFO', message: "LogMemory: Platform Memory Stats for WindowsServer" },
     { level: 'INFO', message: "LogMemory: Process Physical Memory: 214 MB used, 8192 MB physical space" },
     { level: 'INFO', message: "LogUObjectArray: 86420 objects as part of root set at lifetime startup." },
