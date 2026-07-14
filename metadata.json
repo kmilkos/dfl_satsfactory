@@ -1,0 +1,6 @@
+{
+  "name": "DaemonForge Labs: Satisfactory Server Manager",
+  "description": "An industrial-grade Satisfactory server management panel featuring modding support, automated backups, and real-time remote telemetry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
