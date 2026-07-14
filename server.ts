@@ -589,6 +589,165 @@ app.get("/api/server/status", async (req, res) => {
   });
 });
 
+// -----------------------------------------------------------------------------
+// LOG INJECTION STREAMER ENGINE (REAL-TIME HIGH-FIDELITY CONSOLE EMULATION)
+// -----------------------------------------------------------------------------
+let logStreamingTimer: NodeJS.Timeout | null = null;
+
+function stopLogStreaming() {
+  if (logStreamingTimer) {
+    clearInterval(logStreamingTimer);
+    logStreamingTimer = null;
+  }
+}
+
+function streamLogs(logList: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[], speedMs: number = 150, onComplete?: () => void) {
+  stopLogStreaming();
+  let index = 0;
+  
+  logStreamingTimer = setInterval(() => {
+    if (index < logList.length) {
+      const item = logList[index];
+      addLog(item.level, item.message);
+      index++;
+    } else {
+      stopLogStreaming();
+      if (onComplete) {
+        onComplete();
+      }
+    }
+  }, speedMs);
+}
+
+const getStartLogs = () => {
+  const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
+  
+  list.push(
+    { level: 'INFO', message: "LogDaemonForge: Display: Initializing Satisfactory server daemon service via systemd..." },
+    { level: 'INFO', message: "LogDaemonForge: Display: Service state transitioned to STARTING." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Starting dedicated server instance (AppID 1690800)..." },
+    { level: 'INFO', message: "LogInit: Display: Running: FactoryServer.exe -multihome=0.0.0.0" },
+    { level: 'INFO', message: "LogInit: Computer: DESKTOP-DFL-SERVER" },
+    { level: 'INFO', message: "LogInit: CPU Page size 4096, native page size 4096" },
+    { level: 'INFO', message: "LogInit: Physics SDK Version: 4.1.2" },
+    { level: 'INFO', message: "LogInit: Using OS detected language (en-US)." },
+    { level: 'INFO', message: "LogInit: Display: SMLv3.8.0-Build2 found in SML directory." },
+    { level: 'INFO', message: "LogModding: Display: Scanning Mods directory for SML-compatible packages..." }
+  );
+
+  const activeMods = mods.filter(m => m.installed && m.enabled);
+  if (activeMods.length > 0) {
+    activeMods.forEach(mod => {
+      list.push(
+        { level: 'INFO', message: `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...` },
+        { level: 'INFO', message: `LogModding: Display: Mod '${mod.id}' registered successfully. Resolving blueprints...` },
+        { level: 'INFO', message: `LogModding: Display: Compiling Blueprints for '${mod.id}' -> Completed.` }
+      );
+    });
+  } else {
+    list.push({ level: 'WARNING', message: "LogModding: Display: No third-party SML mods detected or enabled in configuration." });
+  }
+
+  list.push(
+    { level: 'INFO', message: "LogInit: Selected Device: AMD Radeon PRO V620" },
+    { level: 'INFO', message: "LogMemory: Platform Memory Stats for WindowsServer" },
+    { level: 'INFO', message: "LogMemory: Process Physical Memory: 214 MB used, 8192 MB physical space" },
+    { level: 'INFO', message: "LogUObjectArray: 86420 objects as part of root set at lifetime startup." },
+    { level: 'INFO', message: "LogContentStreaming: Texture pool size now set to 1000 MB" },
+    { level: 'INFO', message: "LogEngine: Initializing Engine..." },
+    { level: 'INFO', message: "LogNet: Version: 365306 (Protocol 36)" },
+    { level: 'INFO', message: "LogNet: Host name: DaemonForge Server" },
+    { level: 'INFO', message: "LogFactoryGame: Display: Satisfactory Dedicated Server starting..." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Loading Server Configuration settings..." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Max players set to " + serverState.maxPlayers },
+    { level: 'INFO', message: "LogFactoryGame: Display: Auto-Backup system initialized: " + serverState.backupIntervalMinutes + " minute interval." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Loading save game '${serverState.sessionName}'...` },
+    { level: 'INFO', message: "LogFactoryGame: Display: World composition: loading 243 streaming chunks..." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Loaded 8347 actors, 1240 power connectors, 492 conveyor paths." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Subsystem: PowerGridManager status compiled. 3 active grids." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777 UDP." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Server started. Network status green. Loaded session: " + serverState.sessionName },
+    { level: 'INFO', message: "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections." }
+  );
+
+  return list;
+};
+
+const getStopLogs = () => {
+  const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
+  
+  list.push(
+    { level: 'WARNING', message: "LogDaemonForge: Display: Shutdown sequence initiated by operator request." },
+    { level: 'WARNING', message: "LogNet: Join: Releasing active player sessions..." },
+    { level: 'INFO', message: "LogNet: Join: Client 'Greg_DFL' disconnected (Reason: Host shutdown)." },
+    { level: 'INFO', message: "LogNet: Join: Client 'Mascot_Greg' disconnected (Reason: Host shutdown)." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Saving game state '${serverState.sessionName}' before termination...` },
+    { level: 'INFO', message: "LogFactoryGame: Display: Serializing game state... 14.5 MB written." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Auto-saving current state into 'ServerSave_DaemonForge_v3_Shutdown.sav' completed.` },
+    { level: 'INFO', message: "LogModding: Display: Triggering mod shutdown sequences..." }
+  );
+
+  const activeMods = mods.filter(m => m.installed && m.enabled);
+  activeMods.forEach(mod => {
+    list.push({ level: 'INFO', message: `LogModding: Display: Shutting down mod '${mod.id}'...` });
+  });
+
+  list.push(
+    { level: 'INFO', message: "LogNet: Socket closed on 0.0.0.0:7777 UDP." },
+    { level: 'WARNING', message: "LogFactoryGame: Display: Shutdown sequence complete. Fuses cleared. Process terminated." },
+    { level: 'INFO', message: "LogDaemonForge: Display: Service state transitioned to OFFLINE." }
+  );
+
+  return list;
+};
+
+const getRestartLogs = () => {
+  const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
+  
+  list.push(
+    { level: 'WARNING', message: "LogDaemonForge: Display: Warm reboot command executed by operator via panel." },
+    { level: 'WARNING', message: "LogNet: Join: Terminating active client sessions..." },
+    { level: 'INFO', message: "LogNet: Join: Client 'Greg_DFL' disconnected (Reason: Warm reboot)." },
+    { level: 'INFO', message: "LogNet: Join: Client 'Mascot_Greg' disconnected (Reason: Warm reboot)." },
+    { level: 'INFO', message: `LogFactoryGame: Display: Triggering crash-safe autosave for session '${serverState.sessionName}'...` },
+    { level: 'INFO', message: "LogFactoryGame: Display: Auto-saving current state... Completed." },
+    { level: 'INFO', message: "LogFactoryGame: Display: Stopping Dedicated Server daemon instance..." },
+    { level: 'INFO', message: "LogNet: Socket closed on 0.0.0.0:7777 UDP." },
+    { level: 'INFO', message: "LogDaemonForge: Display: Booting dedicated server instance (Warm restart)..." }
+  );
+
+  const startLogs = getStartLogs();
+  const startupFiltered = startLogs.filter(log => !log.message.includes("systemd"));
+  list.push(...startupFiltered);
+
+  return list;
+};
+
+const getUpdateLogs = () => {
+  const list: { level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string }[] = [];
+  
+  list.push(
+    { level: 'INFO', message: "LogDaemonForge: Display: Invoking SteamCMD script update for AppID 1690800..." },
+    { level: 'INFO', message: "SteamCMD: Connecting anonymously to Steam Public..." },
+    { level: 'INFO', message: "SteamCMD: Logging in user 'anonymous' OK" },
+    { level: 'INFO', message: "SteamCMD: App '1690800' state is 0x111. Checking for updates..." },
+    { level: 'INFO', message: "SteamCMD: Download job started. Preparing to pull depot chunks..." },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 5.12% (1.1 MB / 21.5 MB)" },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 22.45% (4.8 MB / 21.5 MB)" },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 48.91% (10.5 MB / 21.5 MB)" },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 76.10% (16.3 MB / 21.5 MB)" },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 98.42% (21.1 MB / 21.5 MB)" },
+    { level: 'INFO', message: "SteamCMD: Update state (0x3) Downloading item: Progress 100.00% (21.5 MB / 21.5 MB) OK" },
+    { level: 'INFO', message: "SteamCMD: Verifying item integrity... Success." },
+    { level: 'INFO', message: "SteamCMD: File system commit completed. Installed AppID 1690800 files verified." },
+    { level: 'INFO', message: "LogDaemonForge: Display: SteamCMD update complete. Checking SML compatibility..." },
+    { level: 'INFO', message: "LogDaemonForge: Display: SML compatible with build v1.0.0.13. Registered successfully." },
+    { level: 'INFO', message: "LogDaemonForge: Display: Restarting server instance automatically with SML v3.8.0-Build3." }
+  );
+
+  return list;
+};
+
 app.post("/api/server/action", (req, res) => {
   const { action } = req.body;
   addLog("COMMAND", `dfl-panel execution: server action requested -> ${action}`);
@@ -597,132 +756,47 @@ app.post("/api/server/action", (req, res) => {
     serverState.status = 'STARTING';
     saveServerState();
 
-    addLog("INFO", "LogDaemonForge: Display: Initializing Satisfactory server daemon service via systemd...");
-    
-    setTimeout(() => {
-      addLog("INFO", "LogFactoryGame: Display: Starting dedicated server instance (AppID 1690800)...");
-    }, 1000);
-
-    setTimeout(() => {
-      addLog("INFO", "LogFactoryGame: Display: SML SMLv3.8.0-Build2 found in SML directory.");
-      const activeMods = mods.filter(m => m.installed && m.enabled);
-      activeMods.forEach((mod, idx) => {
-        setTimeout(() => {
-          addLog("INFO", `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...`);
-        }, idx * 150);
-      });
-    }, 2000);
-
-    setTimeout(() => {
-      addLog("INFO", `LogFactoryGame: Display: Loading save game '${serverState.sessionName}'...`);
-    }, 3200);
-
-    setTimeout(() => {
-      addLog("INFO", "LogFactoryGame: Display: Host IP successfully bound to 0.0.0.0:7777.");
-    }, 4500);
-
-    setTimeout(() => {
+    const logs = getStartLogs();
+    streamLogs(logs, 140, () => {
       runAutoInstallQueue();
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
       saveServerState();
-      addLog("INFO", "LogFactoryGame: Display: Server started. Network status green. Loaded session: " + serverState.sessionName);
-      addLog("INFO", "LogFactoryGame: Display: Dedicated Server V2 initialized, accepting connections.");
-    }, 5500);
+    });
 
   } else if (action === 'STOP') {
-    addLog("WARNING", "LogDaemonForge: Display: Shutdown sequence initiated by operator request.");
-    addLog("WARNING", "LogNet: Join: Releasing active player sessions...");
-    
     serverState.status = 'OFFLINE';
     serverState.uptime = 0;
     serverState.playersOnline = 0;
     saveServerState();
 
-    setTimeout(() => {
-      addLog("INFO", `LogFactoryGame: Display: Saving game state '${serverState.sessionName}' before termination...`);
-    }, 800);
-
-    setTimeout(() => {
-      addLog("INFO", `LogFactoryGame: Display: Auto-saving current state into 'ServerSave_DaemonForge_v3_Shutdown.sav' completed.`);
-    }, 1800);
-
-    setTimeout(() => {
-      addLog("WARNING", "LogFactoryGame: Display: Shutdown sequence complete. Fuses cleared. Process terminated.");
-    }, 2800);
+    const logs = getStopLogs();
+    streamLogs(logs, 160);
 
   } else if (action === 'RESTART') {
     serverState.status = 'STARTING';
     serverState.playersOnline = 0;
     saveServerState();
 
-    addLog("WARNING", "LogDaemonForge: Display: Warm reboot command executed by operator via panel.");
-    addLog("WARNING", "LogNet: Join: Terminating active client sessions...");
-    
-    setTimeout(() => {
-      addLog("INFO", `LogFactoryGame: Display: Triggering crash-safe autosave for session '${serverState.sessionName}'...`);
-    }, 600);
-
-    setTimeout(() => {
-      addLog("INFO", "LogFactoryGame: Display: Stopping Dedicated Server daemon instance...");
-    }, 1500);
-
-    setTimeout(() => {
-      addLog("INFO", "LogDaemonForge: Display: Booting dedicated server instance (Warm restart)...");
-    }, 2400);
-
-    setTimeout(() => {
-      addLog("INFO", "LogFactoryGame: Display: SML SMLv3.8.0-Build2 initialized.");
-      const activeMods = mods.filter(m => m.installed && m.enabled);
-      activeMods.forEach((mod, idx) => {
-        setTimeout(() => {
-          addLog("INFO", `LogModding: Display: Loading mod '${mod.id}' v${mod.version}...`);
-        }, idx * 150);
-      });
-    }, 3200);
-
-    setTimeout(() => {
+    const logs = getRestartLogs();
+    streamLogs(logs, 140, () => {
       runAutoInstallQueue();
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
       saveServerState();
-      addLog("INFO", "LogFactoryGame: Display: Warm reboot complete. Network status green. Session restored.");
-    }, 4800);
+    });
 
   } else if (action === 'UPDATE') {
     serverState.status = 'UPDATING';
     saveServerState();
 
-    addLog("INFO", "LogDaemonForge: Display: Invoking SteamCMD script update for AppID 1690800...");
-    
-    setTimeout(() => {
-      addLog("INFO", "SteamCMD: Connecting anonymously to Steam Public...");
-    }, 1000);
-
-    setTimeout(() => {
-      addLog("INFO", "SteamCMD: Logging in user 'anonymous' OK");
-    }, 2000);
-
-    setTimeout(() => {
-      addLog("INFO", "SteamCMD: App '1690800' state is 0x111. Initiating download job...");
-    }, 3000);
-
-    setTimeout(() => {
-      addLog("INFO", "SteamCMD: Update state (0x3) Downloading item (14.2 MB / 14.2 MB) OK");
-    }, 4200);
-
-    setTimeout(() => {
-      addLog("INFO", "SteamCMD: Verifying item integrity... Success.");
-    }, 5200);
-
-    setTimeout(() => {
+    const logs = getUpdateLogs();
+    streamLogs(logs, 200, () => {
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
       serverState.version = "1.0.0.13 (SML v3.8.0-Build3)";
       saveServerState();
-      addLog("INFO", "LogDaemonForge: Display: SteamCMD update complete. SML verified.");
-      addLog("INFO", "LogDaemonForge: Display: Restarting server instance automatically with SML v3.8.0-Build3.");
-    }, 6200);
+    });
   }
 
   res.json({ success: true, status: serverState.status });
