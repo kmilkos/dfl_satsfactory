@@ -5,15 +5,17 @@ import {
   FolderLock, Info, CheckCircle2, Sliders, ExternalLink,
   Zap, ShieldCheck, Wifi, Database, RotateCw, Star
 } from "lucide-react";
-import { ServerState, Backup, Mod, TelemetryData } from "../types";
+import { ServerState, Backup, Mod, TelemetryData, TelemetryHistoryPoint } from "../types";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 interface OperationsPanelProps {
-  activeSubTab: "nodes" | "backups" | "mods";
+  activeSubTab: "nodes" | "backups" | "mods" | "quick-actions";
   serverStatus: ServerState["status"];
   serverInfo: ServerState;
   backupsList: Backup[];
   modsList: Mod[];
   telemetry: TelemetryData;
+  telemetryHistory: TelemetryHistoryPoint[];
   onServerAction: (action: "START" | "STOP" | "RESTART" | "UPDATE") => Promise<void>;
   onTriggerBackup: () => Promise<void>;
   onSaveBackupConfig: (enabled: boolean, interval: number) => Promise<void>;
@@ -33,6 +35,7 @@ export default function OperationsPanel({
   backupsList,
   modsList,
   telemetry,
+  telemetryHistory,
   onServerAction,
   onTriggerBackup,
   onSaveBackupConfig,
@@ -98,6 +101,30 @@ export default function OperationsPanel({
   const [pingStatus, setPingStatus] = useState<string | null>(null);
 
   const [autoHealActive, setAutoHealActive] = useState(true);
+
+  // Local state for SML status change restart warning
+  const [showRestartWarning, setShowRestartWarning] = useState(false);
+
+  // Auto-clear restart warning when the server goes offline
+  useEffect(() => {
+    if (serverStatus === "OFFLINE") {
+      setShowRestartWarning(false);
+    }
+  }, [serverStatus]);
+
+  const handleToggleModdingLocal = async (enabled: boolean) => {
+    await onToggleModdingProfile(enabled);
+    if (serverStatus !== "OFFLINE") {
+      setShowRestartWarning(true);
+    }
+  };
+
+  const handleServerActionLocal = async (action: "START" | "STOP" | "RESTART" | "UPDATE") => {
+    if (action === "RESTART" || action === "STOP" || action === "UPDATE") {
+      setShowRestartWarning(false);
+    }
+    await onServerAction(action);
+  };
 
   // Mod Discovery & Auto-Install Queue local states
   const [discoveryCache, setDiscoveryCache] = useState<{ lastSync: string; status: string; modsCount: number } | null>(null);
@@ -259,10 +286,41 @@ export default function OperationsPanel({
   );
 
   return (
-    <div className="w-full h-full text-slate-100 flex flex-col xl:flex-row min-h-0">
+    <div className="w-full h-full text-slate-100 flex flex-col min-h-0">
       
       {/* Left Column: Active Panel Workspace (Nodes, Backups, or Mods list) */}
       <div className="flex-1 overflow-y-auto min-h-0">
+        
+        {/* Restart Warning banner from Mascot Greg */}
+        {showRestartWarning && (
+          <div className="mx-6 mt-6 bg-zinc-950/95 border-2 border-orange-500 rounded-xl p-4 shadow-[0_0_20px_rgba(249,115,22,0.2)] relative flex items-start space-x-4 animate-bounce-subtle">
+            {/* Anti-gravity Octahedron Greg Icon */}
+            <div className="shrink-0 flex items-center justify-center w-12 h-12 bg-zinc-900 border border-orange-500/40 rounded-lg text-orange-500 relative">
+              <Sliders className="w-6 h-6 animate-pulse" />
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-orange-500 text-[8px] font-bold text-zinc-950 items-center justify-center font-mono">!</span>
+              </span>
+            </div>
+            
+            {/* Speech Bubble / Text */}
+            <div className="flex-1 text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-wider text-orange-500 uppercase">Mascot_Greg (DaemonForge)</span>
+                <button 
+                  onClick={() => setShowRestartWarning(false)}
+                  className="text-[9px] font-mono text-slate-500 hover:text-slate-300 transition-colors px-1.5 py-0.5 rounded border border-slate-800 hover:border-slate-700 cursor-pointer"
+                >
+                  DISMISS
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-200 font-mono mt-1 leading-normal">
+                "Look, I updated the ficsit-cli installations file for you. But SML loader settings don't hot-reload themselves on a running process. ¯\_(ツ)_/¯ You need to <strong className="text-orange-400 font-bold">RESTART</strong> the server node to apply vanilla/mod status changes."
+              </p>
+            </div>
+          </div>
+        )}
+
       {/* -----------------------------------------------------------------------
           SUB-PANEL: NODES MANAGEMENT
           ----------------------------------------------------------------------- */}
@@ -294,7 +352,7 @@ export default function OperationsPanel({
               {/* Server power controls */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <button
-                  onClick={() => onServerAction("START")}
+                  onClick={() => handleServerActionLocal("START")}
                   disabled={serverStatus === "ONLINE" || serverStatus === "STARTING" || isLoading}
                   className={`flex flex-col items-center justify-center p-4 rounded border transition-all cursor-pointer ${
                     serverStatus === "ONLINE" || serverStatus === "STARTING"
@@ -308,7 +366,7 @@ export default function OperationsPanel({
                 </button>
 
                 <button
-                  onClick={() => onServerAction("STOP")}
+                  onClick={() => handleServerActionLocal("STOP")}
                   disabled={serverStatus === "OFFLINE" || isLoading}
                   className={`flex flex-col items-center justify-center p-4 rounded border transition-all cursor-pointer ${
                     serverStatus === "OFFLINE"
@@ -322,7 +380,7 @@ export default function OperationsPanel({
                 </button>
 
                 <button
-                  onClick={() => onServerAction("RESTART")}
+                  onClick={() => handleServerActionLocal("RESTART")}
                   disabled={serverStatus === "OFFLINE" || isLoading}
                   className={`flex flex-col items-center justify-center p-4 rounded border transition-all cursor-pointer ${
                     serverStatus === "OFFLINE"
@@ -336,7 +394,7 @@ export default function OperationsPanel({
                 </button>
 
                 <button
-                  onClick={() => onServerAction("UPDATE")}
+                  onClick={() => handleServerActionLocal("UPDATE")}
                   disabled={serverStatus === "STARTING" || serverStatus === "UPDATING" || isLoading}
                   className="flex flex-col items-center justify-center p-4 rounded border border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/15 hover:border-blue-500 text-blue-400 transition-all cursor-pointer"
                   id="btn-update"
@@ -439,16 +497,139 @@ export default function OperationsPanel({
                 </div>
                 <div>
                   <button
-                    onClick={() => onToggleModdingProfile(!serverInfo.moddingEnabled)}
+                    onClick={() => handleToggleModdingLocal(!serverInfo.moddingEnabled)}
                     className={`px-4 py-1.5 rounded text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
                       serverInfo.moddingEnabled
                         ? "bg-orange-500/10 text-orange-400 border border-orange-500"
                         : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-300"
                     }`}
                   >
-                    {serverInfo.moddingEnabled ? "MODDING LOCKED ON" : "FORCE STOCK GAME"}
+                    {serverInfo.moddingEnabled ? "MODS ACTIVE (VANILLA: OFF)" : "VANILLA ACTIVE (MODS: OFF)"}
                   </button>
                 </div>
+              </div>
+
+              {/* Dedicated Server Service & Host Node Hardware Telemetry Cards with Graphs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-800/80">
+                
+                {/* 1. Dedicated Server Service Card */}
+                {telemetry.service ? (
+                  <div className="bg-zinc-950/40 border border-slate-800 rounded-lg p-4 space-y-3 font-mono text-xs text-left flex flex-col justify-between">
+                    <div>
+                      <div className="text-slate-300 font-bold uppercase text-[9px] border-b border-slate-800/85 pb-2 flex justify-between items-center">
+                        <span className="flex items-center">
+                          <Terminal className="w-3.5 h-3.5 mr-1 text-orange-500 animate-pulse" /> Dedicated Server Service
+                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                          telemetry.service.activeState === "active" 
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                        }`}>
+                          {telemetry.service.activeState.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
+                        <div className="bg-zinc-900/50 p-2 rounded border border-slate-850">
+                          <span className="text-slate-500 text-[8px] block">SERVICE CPU LOAD</span>
+                          <span className="text-xs font-bold text-orange-450">{telemetry.service.cpuUsagePct}%</span>
+                        </div>
+                        <div className="bg-zinc-900/50 p-2 rounded border border-slate-850">
+                          <span className="text-slate-500 text-[8px] block">SERVICE MEMORY</span>
+                          <span className="text-xs font-bold text-orange-455">{telemetry.service.memoryMb} MB</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Service CPU/Memory Sparkline Graph */}
+                    <div className="h-28 w-full bg-black/20 rounded border border-slate-850 p-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={telemetryHistory}>
+                          <defs>
+                            <linearGradient id="colorServiceCpu" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
+                              <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="2 2" stroke="#1e293b" />
+                          <XAxis dataKey="time" hide />
+                          <YAxis hide domain={[0, 100]} />
+                          <Tooltip 
+                            contentStyle={{ background: '#090d16', borderColor: '#1e293b', fontSize: '9px', fontFamily: 'monospace' }}
+                            labelStyle={{ color: '#64748b' }}
+                          />
+                          <Area 
+                            name="Service CPU %"
+                            type="monotone" 
+                            dataKey="serviceCpu" 
+                            stroke="#f97316" 
+                            fillOpacity={1} 
+                            fill="url(#colorServiceCpu)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-zinc-955/40 border border-slate-800 rounded-lg p-4 font-mono text-xs text-left text-slate-500 flex items-center justify-center h-full min-h-[180px]">
+                    Service telemetry offline or loading...
+                  </div>
+                )}
+
+                {/* 2. Host Node Hardware Card */}
+                <div className="bg-zinc-950/40 border border-slate-800 rounded-lg p-4 space-y-3 font-mono text-xs text-left flex flex-col justify-between">
+                  <div>
+                    <div className="text-slate-300 font-bold uppercase text-[9px] border-b border-slate-800/85 pb-2 flex justify-between items-center">
+                      <span className="flex items-center">
+                        <Sliders className="w-3.5 h-3.5 mr-1 text-orange-500" /> Host Node Hardware
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        ONLINE
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
+                      <div className="bg-zinc-900/50 p-2 rounded border border-slate-850">
+                        <span className="text-slate-500 text-[8px] block">HOST CPU LOAD</span>
+                        <span className="text-xs font-bold text-slate-200">{telemetry.cpuUsage.toFixed(1)}%</span>
+                      </div>
+                      <div className="bg-zinc-900/50 p-2 rounded border border-slate-850">
+                        <span className="text-slate-500 text-[8px] block">HOST RAM USAGE</span>
+                        <span className="text-xs font-bold text-slate-200">{telemetry.ramUsageGb.toFixed(2)} GB</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Host CPU Sparkline Graph */}
+                  <div className="h-28 w-full bg-black/20 rounded border border-slate-850 p-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={telemetryHistory}>
+                        <defs>
+                          <linearGradient id="colorHostCpu" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="2 2" stroke="#1e293b" />
+                        <XAxis dataKey="time" hide />
+                        <YAxis hide domain={[0, 100]} />
+                        <Tooltip 
+                          contentStyle={{ background: '#090d16', borderColor: '#1e293b', fontSize: '9px', fontFamily: 'monospace' }}
+                          labelStyle={{ color: '#64748b' }}
+                        />
+                        <Area 
+                          name="Host CPU %"
+                          type="monotone" 
+                          dataKey="cpu" 
+                          stroke="#3b82f6" 
+                          fillOpacity={1} 
+                          fill="url(#colorHostCpu)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
               </div>
 
             </div>
@@ -488,37 +669,6 @@ export default function OperationsPanel({
                   </span>
                 </div>
 
-                {/* CPU LOAD meter from Elegant Dark theme */}
-                <div className="space-y-1.5 border-b border-slate-800/40 pb-2">
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-slate-400 uppercase">CPU LOAD</span>
-                    <span className="text-orange-400 font-bold">
-                      {serverStatus === "ONLINE" ? `${telemetry.cpuUsage.toFixed(1)}%` : "0.0%"}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-orange-500 transition-all duration-1000" 
-                      style={{ width: `${serverStatus === "ONLINE" ? telemetry.cpuUsage : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* MEM USAGE meter from Elegant Dark theme */}
-                <div className="space-y-1.5 border-b border-slate-800/40 pb-2">
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-slate-400 uppercase">MEM USAGE</span>
-                    <span className="text-orange-400 font-bold">
-                      {serverStatus === "ONLINE" ? `${telemetry.ramUsageGb.toFixed(1)}GB` : "0.0GB"}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-orange-500 transition-all duration-1000" 
-                      style={{ width: `${serverStatus === "ONLINE" ? Math.min(100, (telemetry.ramUsageGb / 16) * 100) : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
 
                 {/* Ports bound */}
                 <div className="flex justify-between items-center text-xs font-mono">
@@ -813,14 +963,14 @@ export default function OperationsPanel({
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-mono font-bold text-slate-300">Mod Loader Status:</span>
                     <button
-                      onClick={() => onToggleModdingProfile(!serverInfo.moddingEnabled)}
+                      onClick={() => handleToggleModdingLocal(!serverInfo.moddingEnabled)}
                       className={`px-3 py-1 rounded text-[10px] font-mono font-bold border transition-all cursor-pointer ${
                         serverInfo.moddingEnabled
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500"
                           : "bg-slate-800/40 text-slate-500 border-slate-700"
                       }`}
                     >
-                      {serverInfo.moddingEnabled ? "LOADER RUNNING" : "LOADER DISABLED"}
+                      {serverInfo.moddingEnabled ? "LOADER ACTIVE (VANILLA: OFF)" : "LOADER DISABLED (VANILLA: ON)"}
                     </button>
                   </div>
                   <p className="text-[10px] text-slate-500 leading-normal font-mono">
@@ -1026,153 +1176,193 @@ export default function OperationsPanel({
       )}
       </div>
 
-      {/* Right Column: Quick Actions Persistent Sidebar */}
-      <div className="w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-slate-800 bg-zinc-950/20 p-6 space-y-6 flex flex-col justify-start overflow-y-auto">
-        <div className="border-b border-slate-800 pb-3 text-left">
-          <span className="text-sm font-mono font-bold tracking-wider text-slate-300 uppercase flex items-center">
-            <Zap className="w-4 h-4 mr-1.5 text-orange-500 animate-pulse" /> Daemon Quick Actions
-          </span>
-          <p className="text-[10px] text-slate-500 font-mono mt-1">Single-click utility operations & telemetry triggers</p>
-        </div>
-
-        <div className="space-y-4">
+      {/* 3b. SUB-PANEL: QUICK ACTIONS (FULL TAB) */}
+      {activeSubTab === "quick-actions" && (
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* Action 1: Validate Server Files */}
-          <div className="space-y-2 text-left">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase">File Integrity</label>
-              {validateStatus && (
-                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded animate-pulse">
-                  {validateStatus}
-                </span>
-              )}
+          {/* Header & Tagline */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4">
+            <div>
+              <h1 className="text-xl font-mono text-orange-500 uppercase tracking-wider font-bold flex items-center">
+                <Zap className="w-5 h-5 mr-2 text-orange-500 animate-pulse" /> Daemon Quick Actions
+              </h1>
+              <p className="text-xs text-slate-400 font-mono mt-1">Single-click utility operations & telemetry triggers</p>
             </div>
-            <button
-              onClick={handleValidateServerFiles}
-              disabled={isValidating || isLoading}
-              id="quick-btn-validate"
-              className={`w-full flex items-center justify-between p-3 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
-                isValidating 
-                  ? "border-orange-500/30 bg-orange-500/5 text-orange-400 font-bold" 
-                  : "border-slate-800 bg-zinc-900/50 text-slate-300 hover:border-slate-700 hover:bg-zinc-900"
-              }`}
-            >
-              <span className="flex items-center">
-                <ShieldCheck className={`w-4 h-4 mr-2 ${isValidating ? "animate-spin text-orange-500" : "text-slate-500"}`} />
-                {isValidating ? "VALIDATING..." : "VALIDATE FILES"}
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded border border-slate-700/50">steamcmd</span>
-            </button>
+            <div className="text-[10px] font-mono text-slate-500 bg-zinc-950 border border-slate-800 px-3 py-1 rounded mt-2 md:mt-0 flex items-center">
+              <Terminal className="w-3.5 h-3.5 mr-1.5" />
+              <span>DAEMONFORGE ENGINE v1.4.2</span>
+            </div>
           </div>
 
-          {/* Action 2: Clear SML Cache */}
-          <div className="space-y-2 text-left">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase">Package Caches</label>
-              {clearCacheStatus && (
-                <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                  {clearCacheStatus}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleClearSmlCache}
-              disabled={isClearingCache || isLoading}
-              id="quick-btn-clear"
-              className={`w-full flex items-center justify-between p-3 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
-                isClearingCache 
-                  ? "border-amber-500/30 bg-amber-500/5 text-amber-400 font-bold" 
-                  : "border-slate-800 bg-zinc-900/50 text-slate-300 hover:border-slate-700 hover:bg-zinc-900"
-              }`}
-            >
-              <span className="flex items-center">
-                <Trash2 className={`w-4 h-4 mr-2 ${isClearingCache ? "animate-bounce text-amber-500" : "text-slate-500"}`} />
-                {isClearingCache ? "CLEARING..." : "CLEAR SML CACHE"}
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded border border-slate-700/50">ficsit-cli</span>
-            </button>
-          </div>
+          {/* Grid Layout for Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Card 1: Validate Server Files */}
+            <div className="bg-zinc-900/60 border border-slate-800 rounded-lg p-5 flex flex-col justify-between space-y-4 hover:border-slate-700 hover:bg-zinc-900 transition-all duration-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">File Integrity Check</span>
+                  <span className="text-[9px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700/50 uppercase font-mono">steamcmd</span>
+                </div>
+                <h3 className="text-sm font-mono font-bold text-slate-200">Verify Server Installation</h3>
+                <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                  Triggers SteamCMD to scan and verify the checksum hashes of all server binary chunks against the Valve database manifest.
+                </p>
+              </div>
 
-          {/* Action 3: Force Telemetry Sync */}
-          <div className="space-y-2 text-left">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase">Sync Engine</label>
-              {forceRefreshStatus && (
-                <span className="text-[9px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
-                  {forceRefreshStatus}
-                </span>
-              )}
+              <div className="space-y-3 pt-2">
+                {validateStatus && (
+                  <div className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded animate-pulse">
+                    {validateStatus}
+                  </div>
+                )}
+                <button
+                  onClick={handleValidateServerFiles}
+                  disabled={isValidating || isLoading}
+                  id="quick-btn-validate"
+                  className={`w-full flex items-center justify-center py-2.5 px-4 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
+                    isValidating 
+                      ? "border-orange-500/30 bg-orange-500/5 text-orange-400 font-bold" 
+                      : "border-slate-800 bg-zinc-950 text-slate-300 hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-400"
+                  }`}
+                >
+                  <ShieldCheck className={`w-4 h-4 mr-2 ${isValidating ? "animate-spin text-orange-500" : "text-slate-500"}`} />
+                  {isValidating ? "VALIDATING..." : "VALIDATE FILES"}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleForceRefreshDaemon}
-              disabled={isForceRefreshing || isLoading}
-              id="quick-btn-refresh"
-              className={`w-full flex items-center justify-between p-3 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
-                isForceRefreshing 
-                  ? "border-cyan-500/30 bg-cyan-500/5 text-cyan-400 font-bold" 
-                  : "border-slate-800 bg-zinc-900/50 text-slate-300 hover:border-slate-700 hover:bg-zinc-900"
-              }`}
-            >
-              <span className="flex items-center">
-                <RefreshCw className={`w-4 h-4 mr-2 ${isForceRefreshing ? "animate-spin text-cyan-500" : "text-slate-500"}`} />
-                {isForceRefreshing ? "SYNCING..." : "FORCE REFRESH"}
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded border border-slate-700/50">daemon</span>
-            </button>
-          </div>
 
-          {/* Action 4: Diagnostic Network Ping Test */}
-          <div className="space-y-2 text-left">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-mono font-bold text-slate-400 uppercase">Diagnostic Ping</label>
-              {pingStatus && (
-                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded animate-pulse">
-                  {pingStatus}
-                </span>
-              )}
+            {/* Card 2: Clear SML Cache */}
+            <div className="bg-zinc-900/60 border border-slate-800 rounded-lg p-5 flex flex-col justify-between space-y-4 hover:border-slate-700 hover:bg-zinc-900 transition-all duration-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Package Cache Clean</span>
+                  <span className="text-[9px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700/50 uppercase font-mono">ficsit-cli</span>
+                </div>
+                <h3 className="text-sm font-mono font-bold text-slate-200">Purge Local SML Caches</h3>
+                <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                  Removes cached mod manifests, local DB lockfiles, and downloaded registry indexes to resolve dependency conflicts.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                {clearCacheStatus && (
+                  <div className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded">
+                    {clearCacheStatus}
+                  </div>
+                )}
+                <button
+                  onClick={handleClearSmlCache}
+                  disabled={isClearingCache || isLoading}
+                  id="quick-btn-clear"
+                  className={`w-full flex items-center justify-center py-2.5 px-4 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
+                    isClearingCache 
+                      ? "border-amber-500/30 bg-amber-500/5 text-amber-400 font-bold" 
+                      : "border-slate-800 bg-zinc-955 text-slate-300 hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-400"
+                  }`}
+                >
+                  <Trash2 className={`w-4 h-4 mr-2 ${isClearingCache ? "animate-bounce text-amber-500" : "text-slate-500"}`} />
+                  {isClearingCache ? "CLEARING..." : "CLEAR SML CACHE"}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handlePingDiagnostics}
-              disabled={isPinging || isLoading}
-              id="quick-btn-ping"
-              className={`w-full flex items-center justify-between p-3 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
-                isPinging 
-                  ? "border-slate-700 bg-slate-800/40 text-slate-300 font-bold" 
-                  : "border-slate-800 bg-zinc-900/50 text-slate-300 hover:border-slate-700 hover:bg-zinc-900"
-              }`}
-            >
-              <span className="flex items-center">
-                <Wifi className={`w-4 h-4 mr-2 ${isPinging ? "animate-pulse text-emerald-500" : "text-slate-500"}`} />
-                {isPinging ? "PINGING..." : "RUN DIAGNOSTIC PING"}
-              </span>
-              <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-500 rounded border border-slate-700/50">udp:7777</span>
-            </button>
-          </div>
 
+            {/* Card 3: Force Telemetry Sync */}
+            <div className="bg-zinc-900/60 border border-slate-800 rounded-lg p-5 flex flex-col justify-between space-y-4 hover:border-slate-700 hover:bg-zinc-900 transition-all duration-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Telemetry Engine Sync</span>
+                  <span className="text-[9px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700/50 uppercase font-mono">daemon</span>
+                </div>
+                <h3 className="text-sm font-mono font-bold text-slate-200">Forced Telemetry Re-align</h3>
+                <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                  Re-opens local host query sockets, purges out-of-order packet buffers, and restarts telemetry streaming.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                {forceRefreshStatus && (
+                  <div className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1.5 rounded">
+                    {forceRefreshStatus}
+                  </div>
+                )}
+                <button
+                  onClick={handleForceRefreshDaemon}
+                  disabled={isForceRefreshing || isLoading}
+                  id="quick-btn-refresh"
+                  className={`w-full flex items-center justify-center py-2.5 px-4 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
+                    isForceRefreshing 
+                      ? "border-cyan-500/30 bg-cyan-500/5 text-cyan-400 font-bold" 
+                      : "border-slate-800 bg-zinc-955 text-slate-300 hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-400"
+                  }`}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isForceRefreshing ? "animate-spin text-cyan-500" : "text-slate-500"}`} />
+                  {isForceRefreshing ? "SYNCING..." : "FORCE REFRESH"}
+                </button>
+              </div>
+            </div>
+
+            {/* Card 4: Diagnostic Network Ping Test */}
+            <div className="bg-zinc-900/60 border border-slate-800 rounded-lg p-5 flex flex-col justify-between space-y-4 hover:border-slate-700 hover:bg-zinc-900 transition-all duration-200">
+              <div className="space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Network Diagnostics</span>
+                  <span className="text-[9px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded border border-slate-700/50 uppercase font-mono">udp:7777</span>
+                </div>
+                <h3 className="text-sm font-mono font-bold text-slate-200">Run Diagnostic Ping</h3>
+                <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                  Sends raw diagnostic packets to UDP port 7777 to measure round-trip time and packet loss status.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                {pingStatus && (
+                  <div className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded animate-pulse">
+                    {pingStatus}
+                  </div>
+                )}
+                <button
+                  onClick={handlePingDiagnostics}
+                  disabled={isPinging || isLoading}
+                  id="quick-btn-ping"
+                  className={`w-full flex items-center justify-center py-2.5 px-4 rounded border text-xs font-mono font-bold tracking-tight transition-all cursor-pointer ${
+                    isPinging 
+                      ? "border-slate-750 bg-slate-800/40 text-slate-300 font-bold" 
+                      : "border-slate-800 bg-zinc-955 text-slate-300 hover:border-orange-500/50 hover:bg-orange-500/10 hover:text-orange-400"
+                  }`}
+                >
+                  <Wifi className={`w-4 h-4 mr-2 ${isPinging ? "animate-pulse text-emerald-500" : "text-slate-500"}`} />
+                  {isPinging ? "PINGING..." : "RUN DIAGNOSTIC PING"}
+                </button>
+              </div>
+            </div>
+
+            {/* Full-width Toggle Box: Auto-Heal Daemon */}
+            <div className="col-span-1 md:col-span-2 bg-zinc-950/60 border border-slate-800/80 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-8 hover:border-orange-500/20 transition-all">
+              <div className="space-y-1.5 text-left flex-1">
+                <span className="text-[9px] font-mono font-bold text-orange-500 uppercase tracking-widest bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 rounded">Security Policy</span>
+                <h3 className="text-sm font-mono font-bold text-slate-200 mt-2">Activate Automated Recovery Daemon</h3>
+                <p className="text-[11px] text-slate-500 font-mono leading-relaxed">
+                  Enables automated recovery protocols to hot-patch memory-leaking SML mods, clear dead sockets, and reload node parameters if inactive player counts drop to 0.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center space-x-3 bg-zinc-900 border border-slate-800 px-4 py-3 rounded-lg self-stretch md:self-auto justify-between">
+                <span className={`text-[10px] font-mono font-bold uppercase ${autoHealActive ? "text-orange-500" : "text-slate-500"}`}>
+                  {autoHealActive ? "ACTIVE" : "STANDBY"}
+                </span>
+                <button
+                  onClick={() => setAutoHealActive(!autoHealActive)}
+                  className={`w-10 h-5 rounded-full p-0.5 transition-all cursor-pointer flex ${autoHealActive ? "bg-orange-500 justify-end" : "bg-slate-800 justify-start"}`}
+                >
+                  <span className="w-4 h-4 rounded-full bg-slate-100 shadow"></span>
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
-
-        {/* Dynamic Toggle helper in sidebar */}
-        <div className="bg-zinc-900/40 border border-slate-800 rounded p-4 space-y-3 text-left">
-          <div className="flex justify-between items-center">
-            <span className="text-[11px] font-mono font-bold text-slate-400 uppercase">Auto-Heal Daemon</span>
-            <button
-              onClick={() => setAutoHealActive(!autoHealActive)}
-              className={`w-8 h-4 rounded-full p-0.5 transition-all cursor-pointer flex ${autoHealActive ? "bg-orange-500 justify-end" : "bg-slate-800 justify-start"}`}
-            >
-              <span className="w-3 h-3 rounded-full bg-slate-100 shadow"></span>
-            </button>
-          </div>
-          <p className="text-[10px] text-slate-500 leading-normal font-mono">
-            Automatically recovers SML hook failures & restarts dead host nodes if active player count drops below 1.
-          </p>
-        </div>
-
-        {/* Decorative footer tag for realism and professional style */}
-        <div className="text-[9px] font-mono text-slate-600 flex items-center justify-center space-x-1.5 pt-4 border-t border-slate-800/40 mt-auto">
-          <Terminal className="w-3.5 h-3.5" />
-          <span>DAEMONFORGE ENGINE v1.4.2</span>
-        </div>
-      </div>
+      )}
 
     </div>
   );

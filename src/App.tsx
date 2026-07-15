@@ -119,7 +119,9 @@ export default function App() {
         const nextPoint: TelemetryHistoryPoint = {
           time: timeString,
           cpu: data.cpuUsage,
-          ram: data.ramUsageGb
+          ram: data.ramUsageGb,
+          serviceCpu: data.service?.cpuUsagePct || 0,
+          serviceRam: data.service?.memoryMb || 0
         };
         const updated = [...prev, nextPoint];
         if (updated.length > 30) {
@@ -303,7 +305,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen min-h-screen bg-zinc-950 font-sans flex flex-col overflow-x-hidden select-none">
+    <div className="w-screen min-h-screen bg-zinc-950 font-sans flex flex-col overflow-x-hidden">
       
       {/* Sticky Command Bridge Header navigation */}
       <CommandBridge 
@@ -326,10 +328,10 @@ export default function App() {
             className="flex-1 bg-zinc-900/40 border border-slate-800 rounded-xl overflow-hidden shadow-2xl flex flex-col"
             id={`stage-${activeTab}`}
           >
-            {/* 1. OPERATIONS PANEL: SERVER NODES, BACKUPS, MODS */}
-            {(activeTab === "nodes" || activeTab === "backups" || activeTab === "mods") && (
+            {/* 1. OPERATIONS PANEL: SERVER NODES, BACKUPS, MODS, QUICK ACTIONS */}
+            {(activeTab === "nodes" || activeTab === "backups" || activeTab === "mods" || activeTab === "quick-actions") && (
               <OperationsPanel
-                activeSubTab={activeTab as "nodes" | "backups" | "mods"}
+                activeSubTab={activeTab as "nodes" | "backups" | "mods" | "quick-actions"}
                 serverStatus={serverStatus}
                 serverInfo={serverInfo}
                 backupsList={backupsList}
@@ -344,6 +346,7 @@ export default function App() {
                 onUninstallMod={handleUninstallMod}
                 onToggleModdingProfile={handleToggleModdingProfile}
                 onRefreshStatus={fetchStatus}
+                telemetryHistory={telemetryHistory}
                 isLoading={isLoading}
               />
             )}

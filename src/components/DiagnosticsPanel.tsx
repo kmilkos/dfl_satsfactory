@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Activity, Cpu, MessageSquare, Send, Terminal, 
   Heart, Plug, Compass, Server, Search, RefreshCw, AlertCircle, PlayCircle,
-  Layers, Box, TrendingUp, Gauge, Users
+  Layers, Box, TrendingUp, Gauge, Users, Sliders
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ConsoleLogLine, TelemetryData, ChatMessage, TelemetryHistoryPoint, ItemThroughput } from "../types";
@@ -119,35 +119,7 @@ export default function DiagnosticsPanel({
             </div>
           </div>
 
-          {/* Telemetry Core Stats Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* CPU */}
-            <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 flex items-center justify-between shadow">
-              <div className="text-left">
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Core CPU Load</span>
-                <span className="text-xl font-mono text-slate-100 font-bold">{telemetry.cpuUsage.toFixed(1)}%</span>
-              </div>
-              <Cpu className="w-8 h-8 text-orange-500/20" />
-            </div>
 
-            {/* RAM */}
-            <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 flex items-center justify-between shadow">
-              <div className="text-left">
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Memory Allocation</span>
-                <span className="text-xl font-mono text-slate-100 font-bold">{telemetry.ramUsageGb.toFixed(2)} GB</span>
-              </div>
-              <Server className="w-8 h-8 text-orange-500/20" />
-            </div>
-
-            {/* TPS */}
-            <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 flex items-center justify-between shadow">
-              <div className="text-left">
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest block">Ticks Per Second (TPS)</span>
-                <span className="text-xl font-mono text-emerald-400 font-bold">{telemetry.tps.toFixed(2)} / 60.0</span>
-              </div>
-              <Activity className="w-8 h-8 text-emerald-500/20" />
-            </div>
-          </div>
 
           {/* FICSIT POWER GRID CONTROL MATRIX (Prominent Full-Width Panel) */}
           <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">

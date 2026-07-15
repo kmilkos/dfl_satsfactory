@@ -54,10 +54,19 @@ export interface ItemThroughput {
   currentRate: number; // net
 }
 
+export interface ServiceStats {
+  mainPid: number;
+  memoryMb: number;
+  cpuUsagePct: number;
+  activeState: string;
+  subState: string;
+}
+
 export interface TelemetryData {
   cpuUsage: number; // percentage
   ramUsageGb: number; // in GB
   tps: number; // Ticks per second (target 60)
+  service?: ServiceStats;
   powerGrids: PowerGridStats[];
   players: PlayerInfo[];
   throughput: ItemThroughput[];
@@ -67,6 +76,8 @@ export interface TelemetryHistoryPoint {
   time: string;
   cpu: number;
   ram: number;
+  serviceCpu?: number;
+  serviceRam?: number;
 }
 
 export interface ChatMessage {

@@ -55,6 +55,17 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus }:
         >
           SML Mods (ficsit-cli)
         </button>
+        <button
+          onClick={() => setActiveTab("quick-actions")}
+          className={`pb-1 border-b-2 transition-all cursor-pointer ${
+            activeTab === "quick-actions"
+              ? "text-orange-500 border-orange-500"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+          id="tab-btn-quick-actions"
+        >
+          Quick Actions
+        </button>
       </nav>
 
       {/* Center: Mascot "Greg" & App Namespace */}

@@ -2,9 +2,11 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import https from "https";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { exec, execSync } from "child_process";
 
 dotenv.config();
 
@@ -64,7 +66,7 @@ function saveState<T>(filename: string, value: T) {
 }
 
 const saveServerState = () => saveState("server_state.json", serverState);
-const saveBackups = () => saveState("backups.json", backups);
+const saveBackups = () => {};
 const saveMods = () => saveState("mods.json", mods);
 const saveAutoInstall = () => saveState("auto_install.json", autoInstallQueue);
 const saveChats = () => saveState("chat_logs.json", inGameChats);
@@ -88,32 +90,45 @@ if (serverState.sessionName === "DaemonForge_Main_World") {
   saveServerState();
 }
 
-let backups = loadState("backups.json", [
-  {
-    id: "bak_001",
-    filename: "ServerSave_DaemonForge_v3_Auto_1.sav",
-    timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    sizeBytes: 14502010,
-    isAuto: true,
-    saveSlot: "DaemonForge_Main_World",
-  },
-  {
-    id: "bak_002",
-    filename: "ServerSave_DaemonForge_v3_Manual_PreMod.sav",
-    timestamp: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    sizeBytes: 14498520,
-    isAuto: false,
-    saveSlot: "DaemonForge_Main_World",
-  },
-  {
-    id: "bak_003",
-    filename: "ServerSave_DaemonForge_v3_Auto_0.sav",
-    timestamp: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-    sizeBytes: 14450122,
-    isAuto: true,
-    saveSlot: "DaemonForge_Main_World",
-  },
-]);
+const SAVE_DIR = "/home/satisfactory/.config/Epic/FactoryGame/Saved/SaveGames/server";
+const BACKUP_DIR = path.join(SAVE_DIR, "backups");
+
+if (!fs.existsSync(BACKUP_DIR)) {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  } catch (e) {
+    console.error("Failed to create backup directory:", e);
+  }
+}
+
+function getBackupFilesCount(): number {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) return 0;
+    return fs.readdirSync(BACKUP_DIR).filter(file => file.endsWith(".sav")).length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function getLatestActiveSaveFile(): string | null {
+  try {
+    if (!fs.existsSync(SAVE_DIR)) return null;
+    const files = fs.readdirSync(SAVE_DIR);
+    const savFiles = files
+      .filter(file => file.endsWith(".sav") && !file.startsWith("ServerSettings"))
+      .map(file => {
+        const filePath = path.join(SAVE_DIR, file);
+        return { file, time: fs.statSync(filePath).mtime.getTime() };
+      });
+    
+    if (savFiles.length === 0) return null;
+    savFiles.sort((a, b) => b.time - a.time);
+    return path.join(SAVE_DIR, savFiles[0].file);
+  } catch (e) {
+    console.error("Failed to find latest active save:", e);
+    return null;
+  }
+}
 
 let mods = loadState("mods.json", [
   {
@@ -279,25 +294,31 @@ setInterval(() => {
     saveServerState();
   }
 
-  // Simulate automated backup triggering based on configuration
+  // Trigger automated backup based on configuration
   if (serverState.status === 'ONLINE' && serverState.autoBackupEnabled) {
     if (Date.now() >= nextAutoBackupTime) {
-      const backupId = `bak_${Math.floor(Math.random() * 90000) + 10000}`;
-      const name = `ServerSave_DaemonForge_v3_Auto_${backups.length}.sav`;
-      const sizeBytes = 14400000 + Math.floor(Math.random() * 200000);
-      backups.unshift({
-        id: backupId,
-        filename: name,
-        timestamp: new Date().toISOString(),
-        sizeBytes,
-        isAuto: true,
-        saveSlot: serverState.sessionName,
-      });
-      saveBackups();
+      const latestSavePath = getLatestActiveSaveFile();
+      if (latestSavePath) {
+        try {
+          const sessionName = serverState.sessionName || "COME HERE";
+          const filename = `backup_${sessionName}_${Date.now()}_auto.sav`;
+          const destPath = path.join(BACKUP_DIR, filename);
 
-      addLog("INFO", `LogDaemonForge: Automated backup triggered. Saved slot '${serverState.sessionName}' into file '${name}' (${(sizeBytes/1024/1024).toFixed(2)} MB).`);
+          if (!fs.existsSync(BACKUP_DIR)) {
+            fs.mkdirSync(BACKUP_DIR, { recursive: true });
+          }
+
+          fs.copyFileSync(latestSavePath, destPath);
+          const stats = fs.statSync(destPath);
+
+          addLog("INFO", `LogDaemonForge: Automated backup triggered. Saved slot '${sessionName}' into file '${filename}' (${(stats.size/1024/1024).toFixed(2)} MB).`);
+        } catch (e: any) {
+          addLog("ERROR", `LogDaemonForge: Automated backup failed: ${e.message}`);
+        }
+      } else {
+        addLog("WARNING", `LogDaemonForge: Automated backup skipped because no active save file was found.`);
+      }
       
-      // Schedule next one (speed up slightly for UI demo feel if desired, but default is standard)
       nextAutoBackupTime = Date.now() + serverState.backupIntervalMinutes * 60 * 1000;
     }
   }
@@ -518,16 +539,193 @@ setInterval(() => {
 // -----------------------------------------------------------------------------
 
 // 1. Server Status Actions
-app.get("/api/server/status", async (req, res) => {
-  if (serverState.status === 'ONLINE') {
-    const rawPlayers = await fetchFromFRM("/getPlayer");
-    if (Array.isArray(rawPlayers)) {
-      serverState.playersOnline = rawPlayers.length;
-      saveServerState();
-    }
-  } else {
-    serverState.playersOnline = 0;
+function getServiceActiveState(): string {
+  try {
+    const stdout = execSync("systemctl show satisfactory --property=ActiveState").toString();
+    const match = stdout.match(/ActiveState=(\w+)/);
+    return match ? match[1] : "inactive";
+  } catch (err) {
+    return "inactive";
   }
+}
+
+function getServiceUptimeSeconds(): number {
+  try {
+    const stdout = execSync("systemctl show satisfactory --property=ActiveEnterTimestamp").toString().trim();
+    const val = stdout.replace("ActiveEnterTimestamp=", "").trim();
+    if (!val || val === "n/a" || val === "inactive") return 0;
+    const match = val.match(/([0-9]{4})-([0-9]{2})-([0-9]{2})\s+([0-9]{2}):([0-9]{2}):([0-9]{2})/);
+    if (match) {
+      const [_, year, month, day, hour, min, sec] = match;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(min), parseInt(sec));
+      const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+      return diffSec > 0 ? diffSec : 0;
+    }
+    return 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+function queryNativeAPI(functionName: string, dataPayload: any = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      function: functionName,
+      data: dataPayload
+    });
+
+    const req = https.request({
+      hostname: "localhost",
+      port: 7777,
+      path: "/api/v1",
+      method: "POST",
+      rejectUnauthorized: false,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": data.length
+      }
+    }, (res) => {
+      let body = "";
+      res.on("data", (chunk) => body += chunk);
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(body);
+          resolve(parsed);
+        } catch (e) {
+          reject(new Error("Invalid JSON: " + body));
+        }
+      });
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    req.write(data);
+    req.end();
+  });
+}
+
+let frmAuthToken = "";
+
+async function syncFRMToken() {
+  try {
+    const response = await queryNativeAPI("GetServerOptions");
+    if (response?.data?.serverOptions) {
+      const token = response.data.serverOptions["FicsitRemoteMonitoring.Server.uWS.AuthenticationToken"];
+      if (token) {
+        frmAuthToken = token;
+      }
+    }
+  } catch (err) {
+    // Ignore error
+  }
+}
+
+// 1. Server Status Actions
+function syncModdingStateWithSystem() {
+  const installationsPath = "/home/satisfactory/.local/share/ficsit/installations.json";
+  if (fs.existsSync(installationsPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(installationsPath, "utf-8"));
+      const selectedInst = config.selected_installation;
+      const inst = config.installations.find((i: any) => i.path === selectedInst);
+      if (inst) {
+        const moddingEnabled = !inst.vanilla;
+        if (serverState.moddingEnabled !== moddingEnabled) {
+          serverState.moddingEnabled = moddingEnabled;
+          saveServerState();
+        }
+      }
+    } catch (e) {
+      console.error("Failed to read installations.json:", e);
+    }
+  }
+}
+
+function getDynamicServerVersion(): string {
+  let gameVersion = "1.2.0";
+  let changelist = "495413";
+  let smlVersion = "";
+
+  try {
+    const versionFilePath = "/home/satisfactory/satisfactory-server/Engine/Binaries/Linux/FactoryServer-Linux-Shipping.version";
+    if (fs.existsSync(versionFilePath)) {
+      const content = fs.readFileSync(versionFilePath, "utf8");
+      const parsed = JSON.parse(content);
+      if (parsed.Changelist) changelist = parsed.Changelist.toString();
+      if (parsed.BranchName) {
+        const match = parsed.BranchName.match(/rel-main-(.+)$/);
+        if (match) {
+          gameVersion = match[1];
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Failed to read dynamic game version:", e);
+  }
+
+  const moddingEnabled = serverState.moddingEnabled;
+  if (moddingEnabled) {
+    try {
+      const upluginPath = "/home/satisfactory/satisfactory-server/FactoryGame/Mods/SML/SML.uplugin";
+      if (fs.existsSync(upluginPath)) {
+        const content = fs.readFileSync(upluginPath, "utf8");
+        const parsed = JSON.parse(content);
+        smlVersion = parsed.SemVersion || parsed.VersionName || "";
+      }
+    } catch (e) {
+      console.error("Failed to read SML version plugin:", e);
+    }
+  }
+
+  if (moddingEnabled) {
+    return `${gameVersion}-CL-${changelist} (SML v${smlVersion || "3.12.0"})`;
+  } else {
+    return `${gameVersion}-CL-${changelist} (Vanilla)`;
+  }
+}
+
+app.get("/api/server/status", async (req, res) => {
+  syncModdingStateWithSystem();
+  
+  // Set version dynamically
+  serverState.version = getDynamicServerVersion();
+  
+  // Try to query native Dedicated Server HTTPS API for live game state
+  try {
+    const stateRes = await queryNativeAPI("QueryServerState");
+    if (stateRes?.data?.serverGameState) {
+      const gs = stateRes.data.serverGameState;
+      serverState.status = 'ONLINE';
+      serverState.sessionName = gs.activeSessionName || "None (No Active Session)";
+      serverState.playersOnline = gs.numConnectedPlayers || 0;
+      serverState.maxPlayers = gs.playerLimit || 4;
+    } else {
+      // Check if systemd service is active
+      const serviceActive = getServiceActiveState();
+      if (serviceActive === "active") {
+        serverState.status = 'STARTING';
+      } else {
+        serverState.status = 'OFFLINE';
+        serverState.playersOnline = 0;
+      }
+    }
+  } catch (err) {
+    // Fallback: Check if service is active
+    const serviceActive = getServiceActiveState();
+    if (serviceActive === "active") {
+      serverState.status = 'STARTING';
+    } else {
+      serverState.status = 'OFFLINE';
+      serverState.playersOnline = 0;
+    }
+  }
+
+  // Update uptime dynamically from systemd
+  serverState.uptime = getServiceUptimeSeconds();
+  saveServerState();
+
   res.json({
     ...serverState,
     nextAutoBackup: new Date(nextAutoBackupTime).toISOString(),
@@ -735,6 +933,14 @@ app.post("/api/server/action", (req, res) => {
     serverState.status = 'STARTING';
     saveServerState();
 
+    exec("systemctl start satisfactory", (error, stdout, stderr) => {
+      if (error) {
+        addLog("ERROR", `LogDaemonForge: systemctl start satisfactory failed: ${stderr || error.message}`);
+      } else {
+        addLog("INFO", "LogDaemonForge: systemctl start satisfactory executed successfully.");
+      }
+    });
+
     const logs = getStartLogs();
     streamLogs(logs, 140, () => {
       runAutoInstallQueue();
@@ -749,6 +955,14 @@ app.post("/api/server/action", (req, res) => {
     serverState.playersOnline = 0;
     saveServerState();
 
+    exec("systemctl stop satisfactory", (error, stdout, stderr) => {
+      if (error) {
+        addLog("ERROR", `LogDaemonForge: systemctl stop satisfactory failed: ${stderr || error.message}`);
+      } else {
+        addLog("INFO", "LogDaemonForge: systemctl stop satisfactory executed successfully.");
+      }
+    });
+
     const logs = getStopLogs();
     streamLogs(logs, 160);
 
@@ -756,6 +970,14 @@ app.post("/api/server/action", (req, res) => {
     serverState.status = 'STARTING';
     serverState.playersOnline = 0;
     saveServerState();
+
+    exec("systemctl restart satisfactory", (error, stdout, stderr) => {
+      if (error) {
+        addLog("ERROR", `LogDaemonForge: systemctl restart satisfactory failed: ${stderr || error.message}`);
+      } else {
+        addLog("INFO", "LogDaemonForge: systemctl restart satisfactory executed successfully.");
+      }
+    });
 
     const logs = getRestartLogs();
     streamLogs(logs, 140, () => {
@@ -769,11 +991,19 @@ app.post("/api/server/action", (req, res) => {
     serverState.status = 'UPDATING';
     saveServerState();
 
+    exec("systemctl restart satisfactory", (error, stdout, stderr) => {
+      if (error) {
+        addLog("ERROR", `LogDaemonForge: systemctl restart satisfactory on update failed: ${stderr || error.message}`);
+      } else {
+        addLog("INFO", "LogDaemonForge: systemctl restart satisfactory on update executed successfully.");
+      }
+    });
+
     const logs = getUpdateLogs();
     streamLogs(logs, 200, () => {
       serverState.status = 'ONLINE';
       serverState.uptime = 0;
-      serverState.version = "1.0.0.13 (SML v3.8.0-Build3)";
+      serverState.version = getDynamicServerVersion();
       saveServerState();
     });
   }
@@ -828,7 +1058,39 @@ app.post("/api/server/create-session", (req, res) => {
 
 // 2. Automated & Saved Backups Panel
 app.get("/api/backups", (req, res) => {
-  res.json(backups);
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
+    const files = fs.readdirSync(BACKUP_DIR);
+    const backupList = files
+      .filter(file => file.endsWith(".sav"))
+      .map(file => {
+        const filePath = path.join(BACKUP_DIR, file);
+        const stats = fs.statSync(filePath);
+        const isAuto = file.includes("_auto.sav");
+        
+        let saveSlot = "Unknown";
+        const parts = file.split("_");
+        if (parts.length >= 4) {
+          saveSlot = parts.slice(1, parts.length - 2).join("_");
+        }
+        
+        return {
+          id: file,
+          filename: file,
+          timestamp: stats.mtime.toISOString(),
+          sizeBytes: stats.size,
+          isAuto: isAuto,
+          saveSlot: saveSlot
+        };
+      });
+      
+    backupList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    res.json(backupList);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to read backups directory: " + err.message });
+  }
 });
 
 app.post("/api/backups/trigger", (req, res) => {
@@ -836,27 +1098,38 @@ app.post("/api/backups/trigger", (req, res) => {
     return res.status(400).json({ error: "Server must be ONLINE to execute save file snapshot." });
   }
 
-  if (serverState.sessionName && serverState.sessionName.startsWith("None")) {
-    return res.status(400).json({ error: "Cannot trigger backup snapshot. No active save game session is loaded. Create a session or load a save game first." });
+  const latestSavePath = getLatestActiveSaveFile();
+  if (!latestSavePath) {
+    return res.status(400).json({ error: "Cannot trigger backup snapshot. No active save game (.sav) files found in the save directory." });
   }
 
-  const id = `bak_${Math.floor(Math.random() * 90000) + 10000}`;
-  const filename = `ServerSave_DaemonForge_Manual_${Math.floor(Date.now()/1000)}.sav`;
-  const sizeBytes = 14510000 + Math.floor(Math.random() * 50000);
+  try {
+    const sessionName = serverState.sessionName || "COME HERE";
+    const filename = `backup_${sessionName}_${Date.now()}_manual.sav`;
+    const destPath = path.join(BACKUP_DIR, filename);
 
-  const newBackup = {
-    id,
-    filename,
-    timestamp: new Date().toISOString(),
-    sizeBytes,
-    isAuto: false,
-    saveSlot: serverState.sessionName,
-  };
+    if (!fs.existsSync(BACKUP_DIR)) {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    }
 
-  backups.unshift(newBackup);
-  saveBackups();
-  addLog("INFO", `LogDaemonForge: Manual backup snapshot completed by user command. File: '${filename}'`);
-  res.json(newBackup);
+    fs.copyFileSync(latestSavePath, destPath);
+    const stats = fs.statSync(destPath);
+
+    const newBackup = {
+      id: filename,
+      filename,
+      timestamp: stats.mtime.toISOString(),
+      sizeBytes: stats.size,
+      isAuto: false,
+      saveSlot: sessionName,
+    };
+
+    addLog("INFO", `LogDaemonForge: Manual backup snapshot completed by user command. File: '${filename}'`);
+    res.json(newBackup);
+  } catch (err: any) {
+    addLog("ERROR", `LogDaemonForge: Manual backup failed: ${err.message}`);
+    res.status(500).json({ error: "Backup failed: " + err.message });
+  }
 });
 
 app.post("/api/backups/config", (req, res) => {
@@ -872,37 +1145,72 @@ app.post("/api/backups/config", (req, res) => {
 
 app.post("/api/backups/restore", (req, res) => {
   const { id } = req.body;
-  const backup = backups.find(b => b.id === id);
-  if (!backup) {
-    return res.status(404).json({ error: "Backup snapshot not found." });
+  const backupPath = path.join(BACKUP_DIR, id);
+
+  if (!fs.existsSync(backupPath)) {
+    return res.status(404).json({ error: "Backup snapshot file not found on disk." });
   }
 
-  addLog("WARNING", `LogDaemonForge: RESTORE initiated for backup '${backup.filename}'. Stopping active thread.`);
+  let sessionName = "COME HERE";
+  const parts = id.split("_");
+  if (parts.length >= 4) {
+    sessionName = parts.slice(1, parts.length - 2).join("_");
+  }
+
+  const destActivePath = path.join(SAVE_DIR, `${sessionName}_autosave_0.sav`);
+
+  addLog("WARNING", `LogDaemonForge: RESTORE initiated for backup '${id}'. Stopping satisfactory.service.`);
   serverState.status = 'STARTING';
   serverState.playersOnline = 0;
   saveServerState();
 
-  setTimeout(() => {
-    serverState.status = 'ONLINE';
-    serverState.sessionName = backup.saveSlot;
-    saveServerState();
-    addLog("INFO", `LogFactoryGame: Loaded save game from snapshot successfully! Active Slot: '${backup.saveSlot}'`);
-  }, 4000);
+  exec("systemctl stop satisfactory", (stopErr, stdout, stderr) => {
+    if (stopErr) {
+      addLog("ERROR", `LogDaemonForge: Failed to stop satisfactory service: ${stderr || stopErr.message}`);
+    } else {
+      addLog("INFO", "LogDaemonForge: satisfactory.service stopped successfully.");
+    }
+
+    try {
+      fs.copyFileSync(backupPath, destActivePath);
+      addLog("INFO", `LogDaemonForge: Copied backup snapshot '${id}' to active save slot '${sessionName}_autosave_0.sav'.`);
+      
+      exec("systemctl start satisfactory", (startErr, startOut, startErrStr) => {
+        if (startErr) {
+          addLog("ERROR", `LogDaemonForge: Failed to start satisfactory service after restore: ${startErrStr || startErr.message}`);
+          serverState.status = 'CRASHED';
+        } else {
+          addLog("INFO", "LogDaemonForge: satisfactory.service started successfully. Loading game level...");
+          serverState.status = 'ONLINE';
+          serverState.sessionName = sessionName;
+        }
+        saveServerState();
+      });
+
+    } catch (copyErr: any) {
+      addLog("ERROR", `LogDaemonForge: Save file restoration failed: ${copyErr.message}`);
+      serverState.status = 'ONLINE';
+      saveServerState();
+    }
+  });
 
   res.json({ success: true, status: serverState.status });
 });
 
 app.delete("/api/backups/:id", (req, res) => {
   const { id } = req.params;
-  const initialLen = backups.length;
-  backups = backups.filter(b => b.id !== id);
+  const backupPath = path.join(BACKUP_DIR, id);
 
-  if (backups.length < initialLen) {
-    saveBackups();
-    addLog("INFO", `LogDaemonForge: Purged local backup entry '${id}' from filesystem index.`);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: "Backup file entry not found." });
+  try {
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+      addLog("INFO", `LogDaemonForge: Purged local backup snapshot file '${id}' from storage.`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Backup snapshot file not found on disk." });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete backup file: " + err.message });
   }
 });
 
@@ -949,9 +1257,23 @@ app.post("/api/mods/uninstall", (req, res) => {
 
 app.post("/api/mods/toggle-profile", (req, res) => {
   const { enabled } = req.body;
+  
+  // SML Modding enabled is inverse of Vanilla mode
+  const command = enabled
+    ? "sudo -i -u satisfactory ficsit-cli installation set-vanilla /home/satisfactory/satisfactory-server -o"
+    : "sudo -i -u satisfactory ficsit-cli installation set-vanilla /home/satisfactory/satisfactory-server";
+    
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      addLog("ERROR", `LogModding: Failed to update vanilla state via ficsit-cli: ${stderr || error.message}`);
+    } else {
+      addLog("INFO", `LogModding: ficsit-cli vanilla state updated successfully. Vanilla mode: ${enabled ? 'OFF' : 'ON'}`);
+    }
+  });
+
   serverState.moddingEnabled = enabled;
   saveServerState();
-  addLog("INFO", `LogModding: Mod manager system overrides toggled. Active mod loads: ${enabled}.`);
+  addLog("INFO", `LogModding: Mod manager system overrides toggled. Active mod loads: ${enabled} (Vanilla: ${enabled ? 'OFF' : 'ON'}).`);
   res.json({ success: true, moddingEnabled: serverState.moddingEnabled });
 });
 
@@ -1053,7 +1375,17 @@ const FRM_BASE = "http://127.0.0.1:8080";
 
 async function fetchFromFRM(endpoint: string) {
   try {
-    const res = await fetch(`${FRM_BASE}${endpoint}`, { signal: AbortSignal.timeout(800) });
+    if (!frmAuthToken) {
+      await syncFRMToken();
+    }
+    const headers: Record<string, string> = {};
+    if (frmAuthToken) {
+      headers["Authorization"] = `Bearer ${frmAuthToken}`;
+    }
+    const res = await fetch(`${FRM_BASE}${endpoint}`, { 
+      headers,
+      signal: AbortSignal.timeout(800) 
+    });
     if (res.ok) {
       return await res.json();
     }
@@ -1063,6 +1395,59 @@ async function fetchFromFRM(endpoint: string) {
   return null;
 }
 
+let lastCpuUsageNSec = 0;
+let lastCpuTimestamp = Date.now();
+
+function getServiceStats() {
+  try {
+    const stdout = execSync("systemctl show satisfactory --property=MainPID,ActiveState,SubState,MemoryCurrent,CPUUsageNSec").toString();
+    const lines = stdout.split("\n");
+    const props: Record<string, string> = {};
+    for (const line of lines) {
+      const idx = line.indexOf("=");
+      if (idx !== -1) {
+        props[line.substring(0, idx)] = line.substring(idx + 1);
+      }
+    }
+
+    const mainPid = parseInt(props["MainPID"] || "0");
+    const memoryBytes = parseInt(props["MemoryCurrent"] || "0");
+    const activeState = props["ActiveState"] || "inactive";
+    const subState = props["SubState"] || "dead";
+    const cpuUsageNSec = parseInt(props["CPUUsageNSec"] || "0");
+
+    const now = Date.now();
+    const timeDeltaMs = now - lastCpuTimestamp;
+    const cpuDeltaNSec = cpuUsageNSec - lastCpuUsageNSec;
+    
+    let cpuUsagePct = 0;
+    if (timeDeltaMs > 0 && cpuDeltaNSec > 0) {
+      cpuUsagePct = (cpuDeltaNSec / (timeDeltaMs * 1000000)) * 100;
+      const maxPct = os.cpus().length * 100;
+      cpuUsagePct = Math.min(maxPct, parseFloat(cpuUsagePct.toFixed(1)));
+    }
+
+    lastCpuUsageNSec = cpuUsageNSec;
+    lastCpuTimestamp = now;
+
+    return {
+      mainPid,
+      memoryMb: parseFloat((memoryBytes / (1024 * 1024)).toFixed(1)),
+      cpuUsagePct,
+      activeState,
+      subState
+    };
+  } catch (err) {
+    return {
+      mainPid: 0,
+      memoryMb: 0,
+      cpuUsagePct: 0,
+      activeState: "inactive",
+      subState: "dead"
+    };
+  }
+}
+
 // 4. Telemetry Endpoint (Ficsit Remote Monitoring telemetry metrics stream)
 app.get("/api/telemetry", async (req, res) => {
   if (serverState.status !== 'ONLINE') {
@@ -1070,6 +1455,7 @@ app.get("/api/telemetry", async (req, res) => {
       cpuUsage: 0,
       ramUsageGb: 0,
       tps: 0,
+      service: getServiceStats(),
       powerGrids: [],
       players: [],
       throughput: []
@@ -1081,6 +1467,7 @@ app.get("/api/telemetry", async (req, res) => {
       cpuUsage: 0.5,
       ramUsageGb: 0.28,
       tps: 0.0,
+      service: getServiceStats(),
       powerGrids: [],
       players: [],
       throughput: []
@@ -1090,35 +1477,27 @@ app.get("/api/telemetry", async (req, res) => {
   // Attempt to fetch actual live telemetry from FRM mod
   const rawPower = await fetchFromFRM("/getPower");
   const rawPlayers = await fetchFromFRM("/getPlayer");
-  const rawProduction = await fetchFromFRM("/getProduction");
+  const rawProduction = await fetchFromFRM("/getProdStats");
 
-  const powerGrids = (Array.isArray(rawPower) && rawPower.length > 0) ? rawPower.map((g: any) => ({
-    gridId: g.PowerID || 0,
-    producedMw: g.PowerProduced || 0,
-    consumedMw: g.PowerConsumed || 0,
-    capacityMw: g.PowerCapacity || 0,
-    batteryChargeMj: g.BatteryCharge || 0,
-    batteryCapacityMj: g.BatteryCapacity || 0
-  })) : [
-    {
-      gridId: 1,
-      producedMw: Math.round(2850 + Math.sin(Date.now() / 10000) * 15),
-      consumedMw: Math.round(2250 + Math.sin(Date.now() / 10000) * 18),
-      capacityMw: 3200,
-      batteryChargeMj: Math.round(45000 + Math.cos(Date.now() / 15000) * 200),
-      batteryCapacityMj: 60000
-    },
-    {
-      gridId: 2,
-      producedMw: Math.round(11200 + Math.cos(Date.now() / 15000) * 25),
-      consumedMw: Math.round(9100 + Math.cos(Date.now() / 15000) * 35),
-      capacityMw: 12500,
-      batteryChargeMj: Math.round(180000 - Math.sin(Date.now() / 10000) * 400),
-      batteryCapacityMj: 240000
-    }
-  ];
+  const powerGrids = Array.isArray(rawPower) ? rawPower.map((g: any) => {
+    const capacityMw = g.PowerCapacity || 0;
+    const producedMw = g.PowerProduction || 0;
+    const consumedMw = g.PowerConsumed || 0;
+    const batteryCapacityMwh = g.BatteryCapacity || 0;
+    const batteryCapacityMj = batteryCapacityMwh * 3600;
+    const batteryChargeMj = ((g.BatteryPercent || 0) / 100) * batteryCapacityMj;
 
-  const players = (Array.isArray(rawPlayers) && rawPlayers.length > 0) ? rawPlayers.map((p: any) => ({
+    return {
+      gridId: g.CircuitGroupID || 0,
+      producedMw,
+      consumedMw,
+      capacityMw,
+      batteryChargeMj,
+      batteryCapacityMj
+    };
+  }) : [];
+
+  const players = Array.isArray(rawPlayers) ? rawPlayers.map((p: any) => ({
     name: p.PlayerName || "",
     pingMs: p.PlayerPing || 0,
     health: p.PlayerHealth || 0,
@@ -1127,26 +1506,18 @@ app.get("/api/telemetry", async (req, res) => {
       y: p.PlayerLocation?.Y || 0,
       z: p.PlayerLocation?.Z || 0
     }
-  })) : [
-    { name: "Greg_DFL", pingMs: Math.round(40 + Math.random() * 5), health: 100, location: { x: 110452, y: -24890, z: 5410 } },
-    { name: "Becky_FICSIT", pingMs: Math.round(15 + Math.random() * 4), health: 100, location: { x: -54102, y: 142095, z: -1202 } },
-    { name: "FICSIT_Pioneer", pingMs: Math.round(50 + Math.random() * 8), health: 85, location: { x: 32049, y: 89344, z: 125 } }
-  ];
+  })) : [];
 
-  const throughput = (Array.isArray(rawProduction) && rawProduction.length > 0) ? rawProduction.map((item: any) => ({
-    name: item.ItemName || "",
-    productionRate: item.ProductionRate || 0,
-    consumptionRate: item.ConsumptionRate || 0,
-    currentRate: item.CurrentRate || 0
-  })) : [
-    { name: "Heavy Modular Frame", productionRate: 12.0 + Math.sin(Date.now() / 20000) * 0.5, consumptionRate: 4.0, currentRate: 8.0 + Math.sin(Date.now() / 20000) * 0.5 },
-    { name: "Motor", productionRate: 25.0 + Math.cos(Date.now() / 25000) * 1.2, consumptionRate: 10.0, currentRate: 15.0 + Math.cos(Date.now() / 25000) * 1.2 },
-    { name: "Steel Pipe", productionRate: 120.0, consumptionRate: 90.0, currentRate: 30.0 },
-    { name: "Concrete", productionRate: 350.0, consumptionRate: 240.0, currentRate: 110.0 },
-    { name: "Modular Frame", productionRate: 45.0, consumptionRate: 30.0, currentRate: 15.0 },
-    { name: "Encased Industrial Beam", productionRate: 18.0, consumptionRate: 12.0, currentRate: 6.0 },
-    { name: "Quickwire", productionRate: 600.0, consumptionRate: 450.0, currentRate: 150.0 }
-  ];
+  const throughput = Array.isArray(rawProduction) ? rawProduction.map((item: any) => {
+    const prod = item.CurrentProd || 0;
+    const cons = item.CurrentConsumed || 0;
+    return {
+      name: item.Name || "",
+      productionRate: prod,
+      consumptionRate: cons,
+      currentRate: prod - cons
+    };
+  }) : [];
 
   // Get actual system CPU and RAM usage to replace fake fluctuating values
   const totalMem = os.totalmem();
@@ -1162,6 +1533,7 @@ app.get("/api/telemetry", async (req, res) => {
     cpuUsage: isNaN(cpuUsage) ? 12.5 : parseFloat(cpuUsage.toFixed(1)),
     ramUsageGb: parseFloat(ramUsageGb.toFixed(2)),
     tps: 60.0,
+    service: getServiceStats(),
     powerGrids,
     players,
     throughput
@@ -1223,7 +1595,7 @@ app.post("/api/greg/chat", async (req, res) => {
 
   // Get current state context to make Greg hyper-aware
   const activeMods = mods.filter(m => m.installed).map(m => `${m.name} v${m.version}`).join(", ");
-  const backupSummary = `${backups.length} snapshots stored, auto-backup is ${serverState.autoBackupEnabled ? 'ENABLED' : 'DISABLED'} at ${serverState.backupIntervalMinutes} mins`;
+  const backupSummary = `${getBackupFilesCount()} snapshots stored, auto-backup is ${serverState.autoBackupEnabled ? 'ENABLED' : 'DISABLED'} at ${serverState.backupIntervalMinutes} mins`;
   const contextPrompt = `
 You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
 You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
