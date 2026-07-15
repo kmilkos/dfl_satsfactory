@@ -200,6 +200,17 @@ let mods = loadState("mods.json", [
     installed: false,
     enabled: false,
     dependencies: ["SML"],
+  },
+  {
+    id: "RemoteHubAccess",
+    name: "Remote HUB Access",
+    version: "1.0.4",
+    author: "Krasimir",
+    description: "Access and submit HUB milestones from anywhere in the world without having to run back to the base.",
+    downloads: 48210,
+    installed: false,
+    enabled: false,
+    dependencies: ["SML"],
   }
 ]);
 
