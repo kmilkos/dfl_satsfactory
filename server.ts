@@ -274,6 +274,7 @@ async function syncInstalledModsFromCLI(): Promise<void> {
                   getModByIdOrReference(modIdOrReference: $ref) {
                     id
                     name
+                    mod_reference
                     short_description
                     downloads
                   }
@@ -286,18 +287,32 @@ async function syncInstalledModsFromCLI(): Promise<void> {
             const smrData = await response.json();
             const smrMod = smrData?.data?.getModByIdOrReference;
             if (smrMod) {
-              mods.push({
-                id: smrMod.id,
-                name: smrMod.name,
-                version: "1.0.0",
-                author: "SMR Repository",
-                description: smrMod.short_description || "",
-                downloads: smrMod.downloads || 0,
-                installed: true,
-                enabled: !!profileEntry.enabled,
-                dependencies: ["SML"]
-              });
-              modified = true;
+              const smrId = smrMod.mod_reference || smrMod.id;
+              const alreadyExists = mods.some(m => m.id === smrId || m.name === smrMod.name);
+              if (!alreadyExists) {
+                mods.push({
+                  id: smrId,
+                  name: smrMod.name,
+                  version: "1.0.0",
+                  author: "SMR Repository",
+                  description: smrMod.short_description || "",
+                  downloads: smrMod.downloads || 0,
+                  installed: true,
+                  enabled: !!profileEntry.enabled,
+                  dependencies: ["SML"]
+                });
+                modified = true;
+              } else {
+                const existing = mods.find(m => m.id === smrId || m.name === smrMod.name);
+                if (existing) {
+                  if (existing.id !== smrId) {
+                    existing.id = smrId;
+                  }
+                  existing.installed = true;
+                  existing.enabled = !!profileEntry.enabled;
+                  modified = true;
+                }
+              }
             }
           }
         } catch (err) {
@@ -587,6 +602,7 @@ async function syncFicsitRegistry() {
             mods {
               id
               name
+              mod_reference
               short_description
               latest_version
               downloads
@@ -617,14 +633,18 @@ async function syncFicsitRegistry() {
       
       // Merge live mod details into local in-memory array
       fetchedMods.forEach((fm: any) => {
-        const existing = mods.find(m => m.id === fm.id);
+        const fmId = fm.mod_reference || fm.id;
+        const existing = mods.find(m => m.id === fmId || m.name === fm.name);
         if (existing) {
+          if (existing.id !== fmId) {
+            existing.id = fmId;
+          }
           existing.downloads = fm.downloads || existing.downloads;
           existing.version = fm.latest_version || existing.version;
           existing.description = fm.short_description || existing.description;
         } else {
           mods.push({
-            id: fm.id,
+            id: fmId,
             name: fm.name,
             version: fm.latest_version || "1.0.0",
             author: "Ficsit Community",
@@ -1405,6 +1425,7 @@ app.get("/api/mods/search", async (req, res) => {
               getModByIdOrReference(modIdOrReference: $ref) {
                 id
                 name
+                mod_reference
                 short_description
                 downloads
               }
@@ -1422,10 +1443,11 @@ app.get("/api/mods/search", async (req, res) => {
     }
 
     if (smrMod) {
-      const localMod = mods.find(lm => lm.id === smrMod.id);
+      const smrId = smrMod.mod_reference || smrMod.id;
+      const localMod = mods.find(lm => lm.id === smrId || lm.name === smrMod.name);
       return res.json([
         localMod || {
-          id: smrMod.id,
+          id: smrId,
           name: smrMod.name,
           version: "1.0.0",
           author: "SMR Repository",
@@ -1448,6 +1470,7 @@ app.get("/api/mods/search", async (req, res) => {
               mods {
                 id
                 name
+                mod_reference
                 short_description
                 downloads
               }
@@ -1462,12 +1485,13 @@ app.get("/api/mods/search", async (req, res) => {
       const smrData = await response.json();
       const rawMods = smrData?.data?.getMods?.mods || [];
       const formattedMods = rawMods.map((m: any) => {
-        const localMod = mods.find(lm => lm.id === m.id);
+        const smrId = m.mod_reference || m.id;
+        const localMod = mods.find(lm => lm.id === smrId || lm.name === m.name);
         if (localMod) {
           return localMod;
         }
         return {
-          id: m.id,
+          id: smrId,
           name: m.name,
           version: "1.0.0",
           author: "SMR Repository",
@@ -1501,6 +1525,7 @@ app.post("/api/mods/install", async (req, res) => {
               getModByIdOrReference(modIdOrReference: $ref) {
                 id
                 name
+                mod_reference
                 short_description
                 downloads
               }
@@ -1513,8 +1538,9 @@ app.post("/api/mods/install", async (req, res) => {
         const smrData = await response.json();
         const smrMod = smrData?.data?.getModByIdOrReference;
         if (smrMod) {
+          const smrId = smrMod.mod_reference || smrMod.id;
           mod = {
-            id: smrMod.id,
+            id: smrId,
             name: smrMod.name,
             version: "1.0.0",
             author: "SMR Repository",
