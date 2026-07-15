@@ -23,6 +23,7 @@ interface OperationsPanelProps {
   onDeleteBackup: (id: string) => Promise<void>;
   onInstallMod: (id: string) => Promise<void>;
   onUninstallMod: (id: string) => Promise<void>;
+  onToggleMod: (id: string, enabled: boolean) => Promise<void>;
   onToggleModdingProfile: (enabled: boolean) => Promise<void>;
   onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
@@ -43,6 +44,7 @@ export default function OperationsPanel({
   onDeleteBackup,
   onInstallMod,
   onUninstallMod,
+  onToggleMod,
   onToggleModdingProfile,
   onRefreshStatus,
   isLoading
@@ -169,6 +171,13 @@ export default function OperationsPanel({
 
   const handleToggleModdingLocal = async (enabled: boolean) => {
     await onToggleModdingProfile(enabled);
+    if (serverStatus !== "OFFLINE") {
+      setShowRestartWarning(true);
+    }
+  };
+
+  const handleToggleModEnabledLocal = async (modId: string, enabled: boolean) => {
+    await onToggleMod(modId, enabled);
     if (serverStatus !== "OFFLINE") {
       setShowRestartWarning(true);
     }
@@ -1147,6 +1156,71 @@ export default function OperationsPanel({
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Card D: Installed SML Mods */}
+              <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
+                <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                  <span className="text-sm font-mono font-bold tracking-wider text-slate-300 uppercase flex items-center">
+                    <CheckCircle2 className="w-4 h-4 mr-1.5 text-orange-500" /> Installed Mods
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    Count: {modsList.filter(m => m.installed).length}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                  {modsList.filter(m => m.installed).length === 0 ? (
+                    <p className="text-[10px] font-mono text-slate-500 text-center py-4">No mods currently installed.</p>
+                  ) : (
+                    modsList.filter(m => m.installed).map(mod => {
+                      const isFRM = mod.id === "FicsitRemoteMonitoring";
+                      return (
+                        <div key={mod.id} className="p-2.5 rounded bg-zinc-950/40 border border-slate-800/80 flex justify-between items-center transition-all hover:border-slate-700/80">
+                          <div className="flex flex-col text-left space-y-0.5">
+                            <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
+                            <div className="flex items-center space-x-2 text-[9px] font-mono text-slate-500">
+                              <span>v{mod.version}</span>
+                              <span>•</span>
+                              <span>{mod.id}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button
+                              onClick={() => handleToggleModEnabledLocal(mod.id, !mod.enabled)}
+                              disabled={isFRM}
+                              title={isFRM ? "Ficsit Remote Monitoring is required to stream panel data" : mod.enabled ? "Disable Mod" : "Enable Mod"}
+                              className={`px-2 py-0.5 rounded text-[8px] font-mono font-bold border transition-all cursor-pointer ${
+                                mod.enabled
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-slate-800/40 text-slate-500 border-slate-700/50"
+                              }`}
+                            >
+                              {mod.enabled ? "ENABLED" : "DISABLED"}
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                if (isFRM) return;
+                                onUninstallMod(mod.id);
+                              }}
+                              disabled={isFRM}
+                              className={`p-1 rounded cursor-pointer ${
+                                isFRM
+                                  ? "text-slate-750"
+                                  : "text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
+                              }`}
+                              title={isFRM ? "Cannot uninstall required SML tool" : "Uninstall Mod"}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })

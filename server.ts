@@ -1430,6 +1430,19 @@ app.post("/api/mods/uninstall", (req, res) => {
   res.json({ success: true, mod });
 });
 
+app.post("/api/mods/toggle", (req, res) => {
+  const { id, enabled } = req.body;
+  const mod = mods.find(m => m.id === id);
+  if (!mod) {
+    return res.status(404).json({ error: "Mod not found." });
+  }
+
+  mod.enabled = enabled;
+  saveMods();
+  addLog("INFO", `LogModding: Mod '${mod.name}' status toggled to: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+  res.json({ success: true, mod });
+});
+
 app.post("/api/mods/toggle-profile", (req, res) => {
   const { enabled } = req.body;
   

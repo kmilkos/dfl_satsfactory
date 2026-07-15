@@ -277,6 +277,23 @@ export default function App() {
     }
   };
 
+  const handleToggleMod = async (id: string, enabled: boolean) => {
+    setIsLoading(true);
+    try {
+      await fetch("/api/mods/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, enabled })
+      });
+      await fetchMods();
+      await fetchLogsAndChats();
+    } catch (err) {
+      console.error("Toggling mod status failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleToggleModdingProfile = async (enabled: boolean) => {
     try {
       await fetch("/api/mods/toggle-profile", {
@@ -344,6 +361,7 @@ export default function App() {
                 onDeleteBackup={handleDeleteBackup}
                 onInstallMod={handleInstallMod}
                 onUninstallMod={handleUninstallMod}
+                onToggleMod={handleToggleMod}
                 onToggleModdingProfile={handleToggleModdingProfile}
                 onRefreshStatus={fetchStatus}
                 telemetryHistory={telemetryHistory}
