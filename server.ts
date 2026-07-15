@@ -232,6 +232,140 @@ if (frmMod) {
   saveMods();
 }
 
+const PROFILES_PATH = "/home/satisfactory/.local/share/ficsit/profiles.json";
+
+async function syncInstalledModsFromCLI(): Promise<void> {
+  try {
+    if (!fs.existsSync(PROFILES_PATH)) {
+      return;
+    }
+    const raw = fs.readFileSync(PROFILES_PATH, "utf8");
+    const data = JSON.parse(raw);
+    const profileMods = data?.profiles?.Default?.mods || {};
+    
+    const installedIDs = Object.keys(profileMods);
+    let modified = false;
+    
+    // Update installed and enabled status for existing mods
+    for (const mod of mods) {
+      const profileEntry = profileMods[mod.id] || profileMods[mod.name];
+      const isCurrentlyInstalled = !!profileEntry;
+      const isCurrentlyEnabled = profileEntry ? !!profileEntry.enabled : false;
+      
+      if (mod.installed !== isCurrentlyInstalled || mod.enabled !== isCurrentlyEnabled) {
+        mod.installed = isCurrentlyInstalled;
+        mod.enabled = isCurrentlyEnabled;
+        modified = true;
+      }
+    }
+    
+    // For any mod installed in the profile that is not in our local list:
+    for (const installedId of installedIDs) {
+      const exists = mods.some(m => m.id === installedId || m.name === installedId);
+      if (!exists) {
+        const profileEntry = profileMods[installedId];
+        try {
+          const response = await fetch("https://api.ficsit.app/v2/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: `
+                query getMod($ref: String!) {
+                  getModByIdOrReference(modIdOrReference: $ref) {
+                    id
+                    name
+                    short_description
+                    downloads
+                  }
+                }
+              `,
+              variables: { ref: installedId }
+            })
+          });
+          if (response.ok) {
+            const smrData = await response.json();
+            const smrMod = smrData?.data?.getModByIdOrReference;
+            if (smrMod) {
+              mods.push({
+                id: smrMod.id,
+                name: smrMod.name,
+                version: "1.0.0",
+                author: "SMR Repository",
+                description: smrMod.short_description || "",
+                downloads: smrMod.downloads || 0,
+                installed: true,
+                enabled: !!profileEntry.enabled,
+                dependencies: ["SML"]
+              });
+              modified = true;
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to fetch details for dynamic mod ${installedId}:`, err);
+          mods.push({
+            id: installedId,
+            name: installedId,
+            version: "1.0.0",
+            author: "Local System",
+            description: "Locally installed mod package.",
+            downloads: 0,
+            installed: true,
+            enabled: !!profileEntry.enabled,
+            dependencies: ["SML"]
+          });
+          modified = true;
+        }
+      }
+    }
+    
+    if (modified) {
+      saveMods();
+    }
+  } catch (err) {
+    console.error("Failed to sync installed mods from profiles.json:", err);
+  }
+}
+
+function updateProfileAndApply(updateFn: (profileMods: any) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!fs.existsSync(PROFILES_PATH)) {
+        reject(new Error("profiles.json file not found."));
+        return;
+      }
+      
+      const raw = fs.readFileSync(PROFILES_PATH, "utf8");
+      const data = JSON.parse(raw);
+      
+      if (!data.profiles) data.profiles = {};
+      if (!data.profiles.Default) data.profiles.Default = { name: "Default", mods: {} };
+      if (!data.profiles.Default.mods) data.profiles.Default.mods = {};
+      
+      updateFn(data.profiles.Default.mods);
+      
+      fs.writeFileSync(PROFILES_PATH, JSON.stringify(data, null, 2), "utf8");
+      
+      addLog("COMMAND", "ficsit-cli execute: ficsit apply");
+      addLog("INFO", "LogModding: Satisfactory Mod Loader (ficsit-cli) synchronizing active profile dependencies...");
+      
+      exec("sudo -i -u satisfactory ficsit apply", (error, stdout, stderr) => {
+        if (error) {
+          addLog("ERROR", `LogModding: Failed to apply SML changes: ${stderr || error.message}`);
+        } else {
+          addLog("INFO", "LogModding: SML profile sync complete. All active game features updated.");
+        }
+      });
+      
+      resolve();
+    } catch (err: any) {
+      reject(err);
+    }
+  });
+}
+
+// Initial sync
+syncInstalledModsFromCLI();
+
 let inGameChats = loadState("chat_logs.json", []);
 
 // Wipe mock messages if they were previously saved
@@ -1247,7 +1381,8 @@ app.delete("/api/backups/:id", (req, res) => {
 });
 
 // 3. Mod Manager (ficsit-cli simulation)
-app.get("/api/mods", (req, res) => {
+app.get("/api/mods", async (req, res) => {
+  await syncInstalledModsFromCLI();
   res.json(mods);
 });
 
@@ -1257,6 +1392,7 @@ app.get("/api/mods/search", async (req, res) => {
     return res.json([]);
   }
 
+  await syncInstalledModsFromCLI();
   try {
     let smrMod: any = null;
     try {
@@ -1407,15 +1543,25 @@ app.post("/api/mods/install", async (req, res) => {
   // Wait 2 seconds to simulate ficsit-cli download, validation, and extraction
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  mod.installed = true;
-  mod.enabled = true;
-  saveMods();
-  addLog("INFO", `ficsit-cli: SML verified. Successfully extracted '${mod.name}' v${mod.version} to /Mods folder.`);
-
-  res.json({ success: true, mod });
+  try {
+    await updateProfileAndApply((profileMods) => {
+      profileMods[mod.id] = {
+        version: ">=0.0.0",
+        enabled: true
+      };
+    });
+    
+    mod.installed = true;
+    mod.enabled = true;
+    saveMods();
+    addLog("INFO", `ficsit-cli: SML verified. Successfully extracted '${mod.name}' v${mod.version} to /Mods folder.`);
+    res.json({ success: true, mod });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update profile: " + err.message });
+  }
 });
 
-app.post("/api/mods/uninstall", (req, res) => {
+app.post("/api/mods/uninstall", async (req, res) => {
   const { id } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -1423,24 +1569,50 @@ app.post("/api/mods/uninstall", (req, res) => {
   }
 
   addLog("COMMAND", `ficsit-cli execute: remove "${id}"`);
-  mod.installed = false;
-  mod.enabled = false;
-  saveMods();
-  addLog("WARNING", `ficsit-cli: Purged mod package '${mod.name}' and clean resolve completed.`);
-  res.json({ success: true, mod });
+  
+  try {
+    await updateProfileAndApply((profileMods) => {
+      delete profileMods[mod.id];
+      delete profileMods[mod.name];
+    });
+    
+    mod.installed = false;
+    mod.enabled = false;
+    saveMods();
+    addLog("WARNING", `ficsit-cli: Purged mod package '${mod.name}' and clean resolve completed.`);
+    res.json({ success: true, mod });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update profile: " + err.message });
+  }
 });
 
-app.post("/api/mods/toggle", (req, res) => {
+app.post("/api/mods/toggle", async (req, res) => {
   const { id, enabled } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
     return res.status(404).json({ error: "Mod not found." });
   }
 
-  mod.enabled = enabled;
-  saveMods();
-  addLog("INFO", `LogModding: Mod '${mod.name}' status toggled to: ${enabled ? 'ENABLED' : 'DISABLED'}`);
-  res.json({ success: true, mod });
+  try {
+    await updateProfileAndApply((profileMods) => {
+      const entry = profileMods[mod.id] || profileMods[mod.name];
+      if (entry) {
+        entry.enabled = enabled;
+      } else {
+        profileMods[mod.id] = {
+          version: ">=0.0.0",
+          enabled: enabled
+        };
+      }
+    });
+
+    mod.enabled = enabled;
+    saveMods();
+    addLog("INFO", `LogModding: Mod '${mod.name}' status toggled to: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+    res.json({ success: true, mod });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update profile: " + err.message });
+  }
 });
 
 app.post("/api/mods/toggle-profile", (req, res) => {
