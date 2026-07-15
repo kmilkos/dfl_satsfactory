@@ -87,6 +87,7 @@ export default function OperationsPanel({
   const [backupEnabled, setBackupEnabled] = useState(serverInfo.autoBackupEnabled);
   const [backupInterval, setBackupInterval] = useState(serverInfo.backupIntervalMinutes);
   const [searchModQuery, setSearchModQuery] = useState("");
+  const [modsSubTab, setModsSubTab] = useState<"installed" | "browse">("installed");
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const [remoteMods, setRemoteMods] = useState<Mod[]>([]);
@@ -343,11 +344,18 @@ export default function OperationsPanel({
   };
 
   // Filtered mods list
-  const filteredMods = modsList.filter(mod => 
-    mod.name.toLowerCase().includes(searchModQuery.toLowerCase()) ||
-    mod.id.toLowerCase().includes(searchModQuery.toLowerCase()) ||
-    mod.author.toLowerCase().includes(searchModQuery.toLowerCase())
-  );
+  const filteredMods = modsList.filter(mod => {
+    const matchesSearch = 
+      mod.name.toLowerCase().includes(searchModQuery.toLowerCase()) ||
+      mod.id.toLowerCase().includes(searchModQuery.toLowerCase()) ||
+      mod.author.toLowerCase().includes(searchModQuery.toLowerCase());
+      
+    if (modsSubTab === "installed") {
+      return mod.installed && matchesSearch;
+    } else {
+      return matchesSearch;
+    }
+  });
 
   return (
     <div className="w-full h-full text-slate-100 flex flex-col min-h-0">
@@ -983,7 +991,7 @@ export default function OperationsPanel({
                 </span>
                 <input
                   type="text"
-                  placeholder="Search mods..."
+                  placeholder={modsSubTab === "installed" ? "Search installed mods..." : "Search mods..."}
                   value={searchModQuery}
                   onChange={(e) => {
                     setSearchModQuery(e.target.value);
@@ -992,20 +1000,22 @@ export default function OperationsPanel({
                     }
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" && modsSubTab === "browse") {
                       handleTriggerRemoteSearch();
                     }
                   }}
                   className="w-full pl-9 pr-4 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-xs text-slate-100 focus:outline-none focus:border-orange-500 placeholder-slate-600"
                 />
               </div>
-              <button
-                onClick={handleTriggerRemoteSearch}
-                disabled={isSearchingRemote || !searchModQuery.trim()}
-                className="px-3 py-1.5 bg-orange-500 text-zinc-950 font-mono font-bold text-xs rounded hover:bg-orange-600 transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSearchingRemote ? "SEARCHING..." : "SEARCH SMR"}
-              </button>
+              {modsSubTab === "browse" && (
+                <button
+                  onClick={handleTriggerRemoteSearch}
+                  disabled={isSearchingRemote || !searchModQuery.trim()}
+                  className="px-3 py-1.5 bg-orange-500 text-zinc-950 font-mono font-bold text-xs rounded hover:bg-orange-600 transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSearchingRemote ? "SEARCHING..." : "SEARCH SMR"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1228,75 +1238,226 @@ export default function OperationsPanel({
                 </div>
               </div>
 
-            </div>
-
-            {/* Right Col: Mods lists */}
+                        {/* Right Col: Mods lists */}
             <div className="lg:col-span-2 bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg flex flex-col">
+              
+              {/* Tab Navigation header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <span className="text-sm font-mono font-bold tracking-wider text-slate-300 uppercase">Available SML Packages ({filteredMods.length > 0 ? filteredMods.length : remoteMods.length})</span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      setModsSubTab("installed");
+                      setSearchModQuery("");
+                    }}
+                    className={`px-4 py-1.5 font-mono text-xs font-bold rounded transition-all cursor-pointer ${
+                      modsSubTab === "installed"
+                        ? "bg-orange-500 text-zinc-950 shadow-md"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-zinc-800/40"
+                    }`}
+                  >
+                    INSTALLED ({modsList.filter(m => m.installed).length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setModsSubTab("browse");
+                      setSearchModQuery("");
+                    }}
+                    className={`px-4 py-1.5 font-mono text-xs font-bold rounded transition-all cursor-pointer ${
+                      modsSubTab === "browse"
+                        ? "bg-orange-500 text-zinc-950 shadow-md"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-zinc-800/40"
+                    }`}
+                  >
+                    BROWSE NEW MODS
+                  </button>
+                </div>
                 <span className="text-xs font-mono text-slate-500">Registry: Ficsit.app API</span>
               </div>
 
               {/* Mod entries listing */}
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[420px]">
-                {filteredMods.length > 0 ? (
-                  filteredMods.map((mod) => (
-                    <div 
-                      key={mod.id}
-                      className="p-3 bg-zinc-900/40 border border-slate-800 hover:border-slate-700 rounded flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 transition-all text-left"
-                    >
-                      {/* Left: Info */}
-                      <div className="space-y-1 pr-4">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
-                          <span className="text-[10px] font-mono text-slate-500">v{mod.version}</span>
-                          {mod.installed && (
-                            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">
-                              INSTALLED
+                {modsSubTab === "installed" ? (
+                  /* --- INSTALLED TAB --- */
+                  filteredMods.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-500 font-mono">
+                      <Info className="w-8 h-8 mb-2" />
+                      {searchModQuery.trim() 
+                        ? `No installed mods matching "${searchModQuery}" found.`
+                        : "No mods currently installed."
+                      }
+                    </div>
+                  ) : (
+                    filteredMods.map((mod) => (
+                      <div 
+                        key={mod.id}
+                        className="p-3 bg-zinc-900/40 border border-slate-800 hover:border-slate-700 rounded flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 transition-all text-left"
+                      >
+                        {/* Left: Info */}
+                        <div className="space-y-1 pr-4">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500">v{mod.version}</span>
+                            <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border transition-all ${
+                              mod.enabled
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : "bg-slate-800/40 text-slate-500 border-slate-700/50"
+                            }`}>
+                              {mod.enabled ? "ACTIVE" : "DISABLED"}
                             </span>
-                          )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 pr-2">
+                            {mod.description}
+                          </p>
+                          <div className="flex items-center space-x-3 text-[9px] font-mono text-slate-500">
+                            <span>Developer: <span className="text-orange-500">{mod.author}</span></span>
+                            <span>Downloads: <span>{mod.downloads.toLocaleString()}</span></span>
+                          </div>
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 pr-2">
-                          {mod.description}
-                        </p>
-                        <div className="flex items-center space-x-3 text-[9px] font-mono text-slate-500">
-                          <span>Developer: <span className="text-orange-500">{mod.author}</span></span>
-                          <span>Downloads: <span>{mod.downloads.toLocaleString()}</span></span>
-                          <span>Dependencies: <span className="text-slate-400">{mod.dependencies.join(", ")}</span></span>
-                        </div>
-                      </div>
 
-                      {/* Right: Actions */}
-                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
-                        {/* Auto-Install Toggle Star */}
-                        <button
-                          onClick={() => handleToggleAutoInstall(mod.id)}
-                          disabled={mod.id === "FicsitRemoteMonitoring"}
-                          title={
-                            mod.id === "FicsitRemoteMonitoring"
-                              ? "Ficsit Remote Monitoring is required at start-up by default."
-                              : autoInstallQueue.includes(mod.id)
-                              ? "Remove from SML Auto-Install Queue"
-                              : "Queue for SML Auto-Install on server boot"
-                          }
-                          className={`p-1 rounded border transition-all cursor-pointer ${
-                            autoInstallQueue.includes(mod.id)
-                              ? "border-orange-500/40 bg-orange-500/10 text-orange-400"
-                              : "border-slate-800 bg-zinc-950/40 text-slate-500 hover:border-slate-700 hover:text-slate-300"
-                          }`}
-                        >
-                          <Star className={`w-3.5 h-3.5 ${autoInstallQueue.includes(mod.id) ? "fill-orange-400" : ""}`} />
-                        </button>
+                        {/* Right: Actions */}
+                        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+                          {/* Toggle Enabled */}
+                          <button
+                            onClick={() => handleToggleModEnabledLocal(mod.id, !mod.enabled)}
+                            disabled={mod.id === "FicsitRemoteMonitoring"}
+                            title={mod.id === "FicsitRemoteMonitoring" ? "Required tool" : mod.enabled ? "Disable Mod" : "Enable Mod"}
+                            className={`px-3 py-1 rounded text-xs font-mono font-bold border transition-all cursor-pointer ${
+                              mod.enabled
+                                ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                : "bg-slate-800/40 hover:bg-slate-800/60 text-slate-400 border-slate-750"
+                            }`}
+                          >
+                            {mod.enabled ? "DISABLE" : "ENABLE"}
+                          </button>
 
-                        {mod.installed ? (
+                          {/* Uninstall Mod */}
                           <button
                             onClick={() => onUninstallMod(mod.id)}
-                            disabled={isLoading}
-                            className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-mono font-bold rounded cursor-pointer transition-all"
+                            disabled={isLoading || mod.id === "FicsitRemoteMonitoring"}
+                            className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-mono font-bold rounded cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             REMOVE
                           </button>
-                        ) : (
+                        </div>
+                      </div>
+                    ))
+                  )
+                ) : (
+                  /* --- BROWSE TAB --- */
+                  filteredMods.length > 0 ? (
+                    filteredMods.map((mod) => (
+                      <div 
+                        key={mod.id}
+                        className="p-3 bg-zinc-900/40 border border-slate-800 hover:border-slate-700 rounded flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 transition-all text-left"
+                      >
+                        {/* Left: Info */}
+                        <div className="space-y-1 pr-4">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500">v{mod.version}</span>
+                            {mod.installed && (
+                              <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">
+                                INSTALLED
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 pr-2">
+                            {mod.description}
+                          </p>
+                          <div className="flex items-center space-x-3 text-[9px] font-mono text-slate-500">
+                            <span>Developer: <span className="text-orange-500">{mod.author}</span></span>
+                            <span>Downloads: <span>{mod.downloads.toLocaleString()}</span></span>
+                            <span>Dependencies: <span className="text-slate-400">{mod.dependencies.join(", ")}</span></span>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+                          {/* Auto-Install Toggle Star */}
+                          <button
+                            onClick={() => handleToggleAutoInstall(mod.id)}
+                            disabled={mod.id === "FicsitRemoteMonitoring"}
+                            title={
+                              mod.id === "FicsitRemoteMonitoring"
+                                ? "Ficsit Remote Monitoring is required at start-up by default."
+                                : autoInstallQueue.includes(mod.id)
+                                ? "Remove from SML Auto-Install Queue"
+                                : "Queue for SML Auto-Install on server boot"
+                            }
+                            className={`p-1 rounded border transition-all cursor-pointer ${
+                              autoInstallQueue.includes(mod.id)
+                                ? "border-orange-500/40 bg-orange-500/10 text-orange-400"
+                                : "border-slate-800 bg-zinc-950/40 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+                            }`}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${autoInstallQueue.includes(mod.id) ? "fill-orange-400" : ""}`} />
+                          </button>
+
+                          {mod.installed ? (
+                            <button
+                              onClick={() => onUninstallMod(mod.id)}
+                              disabled={isLoading}
+                              className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-mono font-bold rounded cursor-pointer transition-all"
+                            >
+                              REMOVE
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onInstallMod(mod.id)}
+                              disabled={isLoading}
+                              className="px-3 py-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-mono font-bold rounded flex items-center cursor-pointer transition-all"
+                            >
+                              <Plus className="w-3.5 h-3.5 mr-1" /> INSTALL
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : isSearchingRemote ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-500 font-mono">
+                      <RefreshCw className="w-8 h-8 mb-2 animate-spin text-orange-500" />
+                      Searching Ficsit.app repository for "{searchModQuery}"...
+                    </div>
+                  ) : remoteMods.length > 0 ? (
+                    remoteMods.map((mod) => (
+                      <div 
+                        key={mod.id}
+                        className="p-3 bg-zinc-900/40 border border-slate-800 hover:border-slate-700 rounded flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 transition-all text-left"
+                      >
+                        {/* Left: Info */}
+                        <div className="space-y-1 pr-4">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
+                            <span className="text-[10px] font-mono text-slate-500">v{mod.version}</span>
+                            <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded">
+                              SMR REPOSITORY
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 pr-2">
+                            {mod.description}
+                          </p>
+                          <div className="flex items-center space-x-3 text-[9px] font-mono text-slate-500">
+                            <span>Developer: <span className="text-orange-500">{mod.author}</span></span>
+                            <span>Downloads: <span>{mod.downloads.toLocaleString()}</span></span>
+                            <span>Dependencies: <span className="text-slate-400">{mod.dependencies.join(", ")}</span></span>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+                          {/* Auto-Install Toggle Star */}
+                          <button
+                            onClick={() => handleToggleAutoInstall(mod.id)}
+                            title="Queue for SML Auto-Install on server boot"
+                            className={`p-1 rounded border transition-all cursor-pointer ${
+                              autoInstallQueue.includes(mod.id)
+                                ? "border-orange-500/40 bg-orange-500/10 text-orange-400"
+                                : "border-slate-800 bg-zinc-950/40 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+                            }`}
+                          >
+                            <Star className={`w-3.5 h-3.5 ${autoInstallQueue.includes(mod.id) ? "fill-orange-400" : ""}`} />
+                          </button>
+
                           <button
                             onClick={() => onInstallMod(mod.id)}
                             disabled={isLoading}
@@ -1304,77 +1465,22 @@ export default function OperationsPanel({
                           >
                             <Plus className="w-3.5 h-3.5 mr-1" /> INSTALL
                           </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : isSearchingRemote ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-slate-500 font-mono">
-                    <RefreshCw className="w-8 h-8 mb-2 animate-spin text-orange-500" />
-                    Searching Ficsit.app repository for "{searchModQuery}"...
-                  </div>
-                ) : remoteMods.length > 0 ? (
-                  remoteMods.map((mod) => (
-                    <div 
-                      key={mod.id}
-                      className="p-3 bg-zinc-900/40 border border-slate-800 hover:border-slate-700 rounded flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 transition-all text-left"
-                    >
-                      {/* Left: Info */}
-                      <div className="space-y-1 pr-4">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs font-mono font-bold text-slate-200">{mod.name}</span>
-                          <span className="text-[10px] font-mono text-slate-500">v{mod.version}</span>
-                          <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded">
-                            SMR REPOSITORY
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 pr-2">
-                          {mod.description}
-                        </p>
-                        <div className="flex items-center space-x-3 text-[9px] font-mono text-slate-500">
-                          <span>Developer: <span className="text-orange-500">{mod.author}</span></span>
-                          <span>Downloads: <span>{mod.downloads.toLocaleString()}</span></span>
-                          <span>Dependencies: <span className="text-slate-400">{mod.dependencies.join(", ")}</span></span>
                         </div>
                       </div>
-
-                      {/* Right: Actions */}
-                      <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
-                        {/* Auto-Install Toggle Star */}
-                        <button
-                          onClick={() => handleToggleAutoInstall(mod.id)}
-                          title="Queue for SML Auto-Install on server boot"
-                          className={`p-1 rounded border transition-all cursor-pointer ${
-                            autoInstallQueue.includes(mod.id)
-                              ? "border-orange-500/40 bg-orange-500/10 text-orange-400"
-                              : "border-slate-800 bg-zinc-950/40 text-slate-500 hover:border-slate-700 hover:text-slate-300"
-                          }`}
-                        >
-                          <Star className={`w-3.5 h-3.5 ${autoInstallQueue.includes(mod.id) ? "fill-orange-400" : ""}`} />
-                        </button>
-
-                        <button
-                          onClick={() => onInstallMod(mod.id)}
-                          disabled={isLoading}
-                          className="px-3 py-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 text-xs font-mono font-bold rounded flex items-center cursor-pointer transition-all"
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" /> INSTALL
-                        </button>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 text-slate-500 font-mono">
+                      <Info className="w-8 h-8 mb-2" />
+                      {searchModQuery.trim() 
+                        ? `No packages matching "${searchModQuery}" found locally or on Ficsit.app.`
+                        : "No packages matching query found on Ficsit.app API."
+                      }
                     </div>
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-slate-500 font-mono">
-                    <Info className="w-8 h-8 mb-2" />
-                    {searchModQuery.trim() 
-                      ? `No packages matching "${searchModQuery}" found locally or on Ficsit.app.`
-                      : "No packages matching query found on Ficsit.app API."
-                    }
-                  </div>
+                  )
                 )}
               </div>
 
-            </div>
+            </div>  </div>
 
           </div>
 
