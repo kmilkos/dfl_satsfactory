@@ -1258,6 +1258,50 @@ app.get("/api/mods/search", async (req, res) => {
   }
 
   try {
+    let smrMod: any = null;
+    try {
+      const response = await fetch("https://api.ficsit.app/v2/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `
+            query getMod($ref: String!) {
+              getModByIdOrReference(modIdOrReference: $ref) {
+                id
+                name
+                short_description
+                downloads
+              }
+            }
+          `,
+          variables: { ref: queryText }
+        })
+      });
+      if (response.ok) {
+        const smrData = await response.json();
+        smrMod = smrData?.data?.getModByIdOrReference;
+      }
+    } catch (e) {
+      // Ignore and fallback
+    }
+
+    if (smrMod) {
+      const localMod = mods.find(lm => lm.id === smrMod.id);
+      return res.json([
+        localMod || {
+          id: smrMod.id,
+          name: smrMod.name,
+          version: "1.0.0",
+          author: "SMR Repository",
+          description: smrMod.short_description || "",
+          downloads: smrMod.downloads || 0,
+          installed: false,
+          enabled: false,
+          dependencies: ["SML"]
+        }
+      ]);
+    }
+
     const response = await fetch("https://api.ficsit.app/v2/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1317,8 +1361,8 @@ app.post("/api/mods/install", async (req, res) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: `
-            query getMod($id: ModID!) {
-              getMod(modId: $id) {
+            query getMod($ref: String!) {
+              getModByIdOrReference(modIdOrReference: $ref) {
                 id
                 name
                 short_description
@@ -1326,12 +1370,12 @@ app.post("/api/mods/install", async (req, res) => {
               }
             }
           `,
-          variables: { id }
+          variables: { ref: id }
         })
       });
       if (response.ok) {
         const smrData = await response.json();
-        const smrMod = smrData?.data?.getMod;
+        const smrMod = smrData?.data?.getModByIdOrReference;
         if (smrMod) {
           mod = {
             id: smrMod.id,
