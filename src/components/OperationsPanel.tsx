@@ -90,6 +90,23 @@ export default function OperationsPanel({
   const [remoteMods, setRemoteMods] = useState<Mod[]>([]);
   const [isSearchingRemote, setIsSearchingRemote] = useState(false);
 
+  const handleTriggerRemoteSearch = async () => {
+    if (!searchModQuery.trim()) return;
+    setIsSearchingRemote(true);
+    setRemoteMods([]);
+    try {
+      const res = await fetch(`/api/mods/search?q=${encodeURIComponent(searchModQuery)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRemoteMods(data);
+      }
+    } catch (err) {
+      console.error("Failed to query SMR API search:", err);
+    } finally {
+      setIsSearchingRemote(false);
+    }
+  };
+
   useEffect(() => {
     if (!searchModQuery.trim()) {
       setRemoteMods([]);
@@ -950,17 +967,36 @@ export default function OperationsPanel({
             </div>
             
             {/* Search Bar */}
-            <div className="relative mt-3 md:mt-0 w-full md:w-72">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-4 w-4 text-slate-500" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search Ficsit.app repository..."
-                value={searchModQuery}
-                onChange={(e) => setSearchModQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-zinc-950 border border-slate-800 rounded font-mono text-xs text-slate-100 focus:outline-none focus:border-orange-500 placeholder-slate-600"
-              />
+            <div className="mt-3 md:mt-0 flex items-center space-x-2 w-full md:w-auto">
+              <div className="relative w-full md:w-64">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Search className="h-4 w-4 text-slate-500" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search mods..."
+                  value={searchModQuery}
+                  onChange={(e) => {
+                    setSearchModQuery(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setRemoteMods([]);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleTriggerRemoteSearch();
+                    }
+                  }}
+                  className="w-full pl-9 pr-4 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-xs text-slate-100 focus:outline-none focus:border-orange-500 placeholder-slate-600"
+                />
+              </div>
+              <button
+                onClick={handleTriggerRemoteSearch}
+                disabled={isSearchingRemote || !searchModQuery.trim()}
+                className="px-3 py-1.5 bg-orange-500 text-zinc-950 font-mono font-bold text-xs rounded hover:bg-orange-600 transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSearchingRemote ? "SEARCHING..." : "SEARCH SMR"}
+              </button>
             </div>
           </div>
 
