@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Terminal, Send, Info, AlertOctagon, HelpCircle } from "lucide-react";
+import { Terminal, Send, Info, AlertOctagon, HelpCircle, Key, CheckCircle2 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -8,10 +8,17 @@ interface Message {
 
 interface GregAssistantProps {
   serverStatus: string;
+  hasGeminiKey: boolean;
+  onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
 }
 
-export default function GregAssistant({ serverStatus, isLoading: serverLoading }: GregAssistantProps) {
+export default function GregAssistant({ 
+  serverStatus, 
+  hasGeminiKey, 
+  onRefreshStatus, 
+  isLoading: serverLoading 
+}: GregAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -20,7 +27,36 @@ export default function GregAssistant({ serverStatus, isLoading: serverLoading }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [isSavingKey, setIsSavingKey] = useState(false);
+  const [keySaveMessage, setKeySaveMessage] = useState("");
   const assistantEndRef = useRef<HTMLDivElement>(null);
+
+  const handleSaveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKeyInput.trim() && !hasGeminiKey) return;
+    setIsSavingKey(true);
+    setKeySaveMessage("");
+    try {
+      const res = await fetch("/api/greg/config-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKeyInput })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setKeySaveMessage("API Key updated successfully!");
+        setApiKeyInput("");
+        if (onRefreshStatus) await onRefreshStatus();
+      } else {
+        setKeySaveMessage("Failed to save API key.");
+      }
+    } catch (err: any) {
+      setKeySaveMessage("Error: " + err.message);
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
 
   // Quick suggestions
   const suggestions = [
@@ -127,6 +163,58 @@ export default function GregAssistant({ serverStatus, isLoading: serverLoading }
               <li>• Patience: <span className="text-rose-400 font-bold">Extremely Low</span></li>
               <li>• Visor Status: <span className="text-slate-200">¯\_(ツ)_/¯ enabled</span></li>
             </ul>
+          </div>
+
+          {/* Gemini API Key Configuration Card */}
+          <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 space-y-3 shadow-lg">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center">
+              <Key className="w-4 h-4 mr-1.5 text-orange-500" /> API Configuration
+            </span>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-mono text-slate-500 uppercase">Mascot AI status:</span>
+              <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold ${
+                hasGeminiKey 
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  : "bg-orange-500/10 text-orange-400 border border-orange-500/20 animate-pulse"
+              }`}>
+                {hasGeminiKey ? "ACTIVE" : "OFFLINE STUBS"}
+              </span>
+            </div>
+
+            <p className="text-[10px] font-mono text-slate-500 leading-normal">
+              {hasGeminiKey 
+                ? "Mascot engine fully initialized via Google Gemini API." 
+                : "Mascot is operating in offline sandbox mode. Enter a Gemini API Key to enable cognitive reasoning."}
+            </p>
+
+            <form onSubmit={handleSaveApiKey} className="space-y-2 pt-1.5">
+              <input
+                type="password"
+                placeholder={hasGeminiKey ? "••••••••••••••••" : "Enter GEMINI_API_KEY..."}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                disabled={isSavingKey}
+                className="w-full px-2.5 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-[10px] text-slate-100 placeholder-slate-700 focus:outline-none focus:border-orange-500"
+              />
+              <button
+                type="submit"
+                disabled={isSavingKey || (!apiKeyInput.trim() && !hasGeminiKey)}
+                className={`w-full py-1.5 rounded font-mono font-bold text-[10px] transition-colors cursor-pointer ${
+                  !apiKeyInput.trim() && !hasGeminiKey
+                    ? "bg-slate-850 text-slate-500 border border-slate-800"
+                    : "bg-orange-500 text-zinc-950 hover:bg-orange-600"
+                }`}
+              >
+                {isSavingKey ? "SAVING..." : hasGeminiKey && !apiKeyInput.trim() ? "CLEAR KEY" : "SAVE KEY"}
+              </button>
+            </form>
+            
+            {keySaveMessage && (
+              <p className="text-[9px] font-mono text-center text-slate-400 animate-pulse">
+                {keySaveMessage}
+              </p>
+            )}
           </div>
         </div>
 

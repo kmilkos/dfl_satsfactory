@@ -368,6 +368,8 @@ export default function App() {
             {activeTab === "assistant" && (
               <GregAssistant 
                 serverStatus={serverStatus}
+                hasGeminiKey={serverInfo.hasGeminiKey || false}
+                onRefreshStatus={fetchStatus}
                 isLoading={isLoading}
               />
             )}

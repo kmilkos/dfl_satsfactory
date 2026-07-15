@@ -18,7 +18,7 @@ const PORT = 3000;
 // Lazy initialization of Google GenAI for safety
 let aiClient: GoogleGenAI | null = null;
 function getGemini(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY;
+  const key = process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey;
   if (!key) {
     return null;
   }
@@ -729,6 +729,7 @@ app.get("/api/server/status", async (req, res) => {
   res.json({
     ...serverState,
     nextAutoBackup: new Date(nextAutoBackupTime).toISOString(),
+    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey)
   });
 });
 
@@ -1598,6 +1599,15 @@ app.get("/api/docs/:id", (req, res) => {
     }
     res.json({ content: data });
   });
+});
+
+app.post("/api/greg/config-key", (req, res) => {
+  const { apiKey } = req.body;
+  (serverState as any).geminiApiKey = apiKey || "";
+  saveServerState();
+  aiClient = null;
+  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API Key credentials. Resetting Greg AI client. hasKey: ${!!apiKey}`);
+  res.json({ success: true, hasGeminiKey: !!apiKey });
 });
 
 // 8. Greg AI Assistant Terminal Chat (Sarcastic IT Veteran Mascot with actual server context)

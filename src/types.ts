@@ -8,6 +8,7 @@ export interface ServerState {
   autoBackupEnabled: boolean;
   backupIntervalMinutes: number;
   moddingEnabled: boolean;
+  hasGeminiKey?: boolean;
 }
 
 export interface Backup {
