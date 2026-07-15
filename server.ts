@@ -131,6 +131,20 @@ function getLatestActiveSaveFile(): string | null {
   }
 }
 
+function getSessionNameFromLatestSave(): string {
+  const latestSavePath = getLatestActiveSaveFile();
+  if (latestSavePath) {
+    const base = path.basename(latestSavePath);
+    if (base.includes("_autosave_")) {
+      return base.substring(0, base.indexOf("_autosave_"));
+    }
+    if (base.endsWith(".sav")) {
+      return base.substring(0, base.length - 4);
+    }
+  }
+  return "None (No Active Session)";
+}
+
 let mods = loadState("mods.json", [
   {
     id: "FicsitRemoteMonitoring",
@@ -699,11 +713,15 @@ app.get("/api/server/status", async (req, res) => {
     if (stateRes?.data?.serverGameState) {
       const gs = stateRes.data.serverGameState;
       serverState.status = 'ONLINE';
-      serverState.sessionName = gs.activeSessionName || "None (No Active Session)";
+      
+      let session = gs.activeSessionName;
+      if (!session || session.startsWith("None")) {
+        session = getSessionNameFromLatestSave();
+      }
+      serverState.sessionName = session;
       serverState.playersOnline = gs.numConnectedPlayers || 0;
       serverState.maxPlayers = gs.playerLimit || 4;
     } else {
-      // Check if systemd service is active
       const serviceActive = getServiceActiveState();
       if (serviceActive === "active") {
         serverState.status = 'STARTING';
@@ -711,9 +729,9 @@ app.get("/api/server/status", async (req, res) => {
         serverState.status = 'OFFLINE';
         serverState.playersOnline = 0;
       }
+      serverState.sessionName = getSessionNameFromLatestSave();
     }
   } catch (err) {
-    // Fallback: Check if service is active
     const serviceActive = getServiceActiveState();
     if (serviceActive === "active") {
       serverState.status = 'STARTING';
@@ -721,6 +739,7 @@ app.get("/api/server/status", async (req, res) => {
       serverState.status = 'OFFLINE';
       serverState.playersOnline = 0;
     }
+    serverState.sessionName = getSessionNameFromLatestSave();
   }
 
   // Update uptime dynamically from systemd
