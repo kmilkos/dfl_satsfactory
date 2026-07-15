@@ -1364,9 +1364,11 @@ app.post("/api/actions/clear-cache", (req, res) => {
   res.json({ success: true, message: "SML Cache successfully cleared. Manifest indices rebuilt." });
 });
 
-app.post("/api/actions/force-refresh", (req, res) => {
+app.post("/api/actions/force-refresh", async (req, res) => {
   addLog("COMMAND", "dfl-daemon: Daemon manual forced refresh requested by admin.");
   addLog("INFO", "LogDaemonForge: Syncing state buffers, resetting packet sockets.");
+  frmAuthToken = "";
+  await syncFRMToken();
   res.json({ success: true, message: "Forced refresh complete. Telemetry buffers synced." });
 });
 
@@ -1382,10 +1384,22 @@ async function fetchFromFRM(endpoint: string) {
     if (frmAuthToken) {
       headers["Authorization"] = `Bearer ${frmAuthToken}`;
     }
-    const res = await fetch(`${FRM_BASE}${endpoint}`, { 
+    let res = await fetch(`${FRM_BASE}${endpoint}`, { 
       headers,
       signal: AbortSignal.timeout(800) 
     });
+    if (res.status === 401 || res.status === 403) {
+      frmAuthToken = "";
+      await syncFRMToken();
+      const retryHeaders: Record<string, string> = {};
+      if (frmAuthToken) {
+        retryHeaders["Authorization"] = `Bearer ${frmAuthToken}`;
+      }
+      res = await fetch(`${FRM_BASE}${endpoint}`, { 
+        headers: retryHeaders,
+        signal: AbortSignal.timeout(800) 
+      });
+    }
     if (res.ok) {
       return await res.json();
     }

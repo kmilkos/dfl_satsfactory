@@ -194,6 +194,7 @@
 <a class="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors" href="#">Telemetry</a>
 <a class="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors" href="#">Logistics</a>
 <a class="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors" href="#">Archives</a>
+<a class="text-on-surface-variant font-label-caps text-label-caps hover:text-primary transition-colors" href="/admin">Administration</a>
 </nav>
 <div class="flex items-center gap-4">
 <div class="flex items-center gap-3">
@@ -231,6 +232,10 @@
 <span class="material-symbols-outlined">lan</span>
 <span class="font-label-caps text-label-caps">Network</span>
 </div>
+<a class="text-on-surface-variant hover:bg-surface-variant/30 px-4 py-3 flex items-center gap-3 transition-all cursor-pointer block" href="/admin">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+<span class="font-label-caps text-label-caps">Administration</span>
+</a>
 </nav>
 <button class="mt-auto bg-primary text-on-primary font-label-caps text-label-caps py-4 chamfer-br hover:shadow-[0_0_15px_rgba(249,115,22,0.5)] transition-all uppercase">Initialize Scan</button>
 </aside>
