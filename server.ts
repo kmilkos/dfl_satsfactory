@@ -1251,11 +1251,110 @@ app.get("/api/mods", (req, res) => {
   res.json(mods);
 });
 
+app.get("/api/mods/search", async (req, res) => {
+  const queryText = req.query.q as string;
+  if (!queryText) {
+    return res.json([]);
+  }
+
+  try {
+    const response = await fetch("https://api.ficsit.app/v2/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query getMods($q: String) {
+            getMods(filter: { search: $q, limit: 15 }) {
+              mods {
+                id
+                name
+                short_description
+                downloads
+              }
+            }
+          }
+        `,
+        variables: { q: queryText }
+      })
+    });
+    
+    if (response.ok) {
+      const smrData = await response.json();
+      const rawMods = smrData?.data?.getMods?.mods || [];
+      const formattedMods = rawMods.map((m: any) => {
+        const localMod = mods.find(lm => lm.id === m.id);
+        if (localMod) {
+          return localMod;
+        }
+        return {
+          id: m.id,
+          name: m.name,
+          version: "1.0.0",
+          author: "SMR Repository",
+          description: m.short_description || "",
+          downloads: m.downloads || 0,
+          installed: false,
+          enabled: false,
+          dependencies: ["SML"]
+        };
+      });
+      res.json(formattedMods);
+    } else {
+      res.status(500).json({ error: "Failed to fetch mods from Ficsit.app repository." });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: "SMR search failed: " + err.message });
+  }
+});
+
 app.post("/api/mods/install", async (req, res) => {
   const { id } = req.body;
-  const mod = mods.find(m => m.id === id);
+  let mod = mods.find(m => m.id === id);
   if (!mod) {
-    return res.status(404).json({ error: "Mod not found in Ficsit.app repository." });
+    try {
+      const response = await fetch("https://api.ficsit.app/v2/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `
+            query getMod($id: ModID!) {
+              getMod(modId: $id) {
+                id
+                name
+                short_description
+                downloads
+              }
+            }
+          `,
+          variables: { id }
+        })
+      });
+      if (response.ok) {
+        const smrData = await response.json();
+        const smrMod = smrData?.data?.getMod;
+        if (smrMod) {
+          mod = {
+            id: smrMod.id,
+            name: smrMod.name,
+            version: "1.0.0",
+            author: "SMR Repository",
+            description: smrMod.short_description || "",
+            downloads: smrMod.downloads || 0,
+            installed: false,
+            enabled: false,
+            dependencies: ["SML"]
+          };
+          mods.push(mod);
+          saveMods();
+        }
+      }
+    } catch (err) {
+      console.error("Failed to dynamically resolve mod from SMR:", err);
+    }
+  }
+
+  if (!mod) {
+    return res.status(404).json({ error: "Mod not found in local index or Ficsit.app repository." });
   }
 
   addLog("COMMAND", `ficsit-cli execute: install "${id}"`);
