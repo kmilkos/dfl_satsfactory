@@ -82,6 +82,7 @@ let serverState = loadState("server_state.json", {
   autoBackupEnabled: true,
   backupIntervalMinutes: 15,
   moddingEnabled: true,
+  geminiModel: "gemini-2.5-flash",
 });
 
 // Run a migration step to uninitialize session name if it was set to the default mock name
@@ -1602,12 +1603,21 @@ app.get("/api/docs/:id", (req, res) => {
 });
 
 app.post("/api/greg/config-key", (req, res) => {
-  const { apiKey } = req.body;
-  (serverState as any).geminiApiKey = apiKey || "";
+  const { apiKey, model } = req.body;
+  if (apiKey !== undefined) {
+    (serverState as any).geminiApiKey = apiKey || "";
+  }
+  if (model) {
+    (serverState as any).geminiModel = model;
+  }
   saveServerState();
   aiClient = null;
-  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API Key credentials. Resetting Greg AI client. hasKey: ${!!apiKey}`);
-  res.json({ success: true, hasGeminiKey: !!apiKey });
+  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-2.5-flash"}. Resetting Greg AI client.`);
+  res.json({ 
+    success: true, 
+    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey),
+    geminiModel: (serverState as any).geminiModel
+  });
 });
 
 // 8. Greg AI Assistant Terminal Chat (Sarcastic IT Veteran Mascot with actual server context)
@@ -1661,7 +1671,7 @@ Answer the user's technical questions, troubleshoot server crashes, or comment o
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: (serverState as any).geminiModel || "gemini-2.5-flash",
       contents,
       config: {
         systemInstruction: contextPrompt,

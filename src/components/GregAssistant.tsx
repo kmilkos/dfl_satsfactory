@@ -9,6 +9,7 @@ interface Message {
 interface GregAssistantProps {
   serverStatus: string;
   hasGeminiKey: boolean;
+  geminiModel: string;
   onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
 }
@@ -16,6 +17,7 @@ interface GregAssistantProps {
 export default function GregAssistant({ 
   serverStatus, 
   hasGeminiKey, 
+  geminiModel,
   onRefreshStatus, 
   isLoading: serverLoading 
 }: GregAssistantProps) {
@@ -53,6 +55,29 @@ export default function GregAssistant({
       }
     } catch (err: any) {
       setKeySaveMessage("Error: " + err.message);
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
+  const handleModelChange = async (newModel: string) => {
+    setIsSavingKey(true);
+    setKeySaveMessage("");
+    try {
+      const res = await fetch("/api/greg/config-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: newModel })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setKeySaveMessage(`Model updated to ${newModel}`);
+        if (onRefreshStatus) await onRefreshStatus();
+      } else {
+        setKeySaveMessage("Failed to update model configuration.");
+      }
+    } catch (err: any) {
+      setKeySaveMessage("Error updating model: " + err.message);
     } finally {
       setIsSavingKey(false);
     }
@@ -187,6 +212,19 @@ export default function GregAssistant({
                 ? "Mascot engine fully initialized via Google Gemini API." 
                 : "Mascot is operating in offline sandbox mode. Enter a Gemini API Key to enable cognitive reasoning."}
             </p>
+
+            <div className="space-y-1 text-left pt-1 border-t border-slate-800/60">
+              <label className="text-[9px] font-mono text-slate-500 uppercase font-bold">Engine Model</label>
+              <select
+                value={geminiModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                disabled={isSavingKey}
+                className="w-full px-2.5 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-[10px] text-slate-300 focus:outline-none focus:border-orange-500 cursor-pointer"
+              >
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Analytical)</option>
+              </select>
+            </div>
 
             <form onSubmit={handleSaveApiKey} className="space-y-2 pt-1.5">
               <input

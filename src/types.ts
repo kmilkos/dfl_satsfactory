@@ -9,6 +9,7 @@ export interface ServerState {
   backupIntervalMinutes: number;
   moddingEnabled: boolean;
   hasGeminiKey?: boolean;
+  geminiModel?: string;
 }
 
 export interface Backup {

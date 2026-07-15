@@ -369,6 +369,7 @@ export default function App() {
               <GregAssistant 
                 serverStatus={serverStatus}
                 hasGeminiKey={serverInfo.hasGeminiKey || false}
+                geminiModel={serverInfo.geminiModel || "gemini-2.5-flash"}
                 onRefreshStatus={fetchStatus}
                 isLoading={isLoading}
               />
