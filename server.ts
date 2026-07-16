@@ -853,13 +853,17 @@ async function syncFicsitRegistry() {
     const graphqlQuery = {
       query: `
         query {
-          getMods(filter: { limit: 15, order_by: downloads, order_desc: true }) {
+          getMods(filter: { limit: 15, order_by: downloads, order: desc }) {
             mods {
               id
               name
               mod_reference
               short_description
-              latest_version
+              latestVersions {
+                release {
+                  version
+                }
+              }
               downloads
             }
           }
@@ -890,18 +894,19 @@ async function syncFicsitRegistry() {
       fetchedMods.forEach((fm: any) => {
         const fmId = fm.mod_reference || fm.id;
         const existing = mods.find(m => m.id === fmId || m.name === fm.name);
+        const fmVer = fm.latestVersions?.release?.version || fm.latest_version || "1.0.0";
         if (existing) {
           if (existing.id !== fmId) {
             existing.id = fmId;
           }
           existing.downloads = fm.downloads || existing.downloads;
-          existing.version = fm.latest_version || existing.version;
+          existing.version = fmVer;
           existing.description = fm.short_description || existing.description;
         } else {
           mods.push({
             id: fmId,
             name: fm.name,
-            version: fm.latest_version || "1.0.0",
+            version: fmVer,
             author: "Ficsit Community",
             description: fm.short_description || "No description provided.",
             downloads: fm.downloads || 0,
