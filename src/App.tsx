@@ -672,7 +672,7 @@ export default function App() {
   }
 
   return (
-    <div className="w-screen min-h-screen bg-zinc-955 font-sans flex flex-col overflow-x-hidden text-slate-100">
+    <div className="w-screen min-h-screen bg-zinc-950 font-sans flex flex-col overflow-x-hidden text-slate-100">
       
       {/* Sticky Command Bridge Header navigation */}
       <CommandBridge 
