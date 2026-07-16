@@ -519,6 +519,7 @@ setInterval(async () => {
         // 1. If service is failed or should be running but is offline
         if (serviceActive === "failed" || (serverState.status === "ONLINE" && serviceActive !== "active")) {
           addLog("ERROR", `[AUTO-HEAL] Dedicated server service is in state '${serviceActive}' (expected: active). Recovering...`);
+          gregCommentOnEvent(`Outage detected! Server service is in state '${serviceActive}'. Initiating automated recovery.`);
           exec("systemctl restart satisfactory", (err, stdout, stderr) => {
             if (err) addLog("ERROR", `[AUTO-HEAL] Restart failed: ${stderr || err.message}`);
             else addLog("INFO", `[AUTO-HEAL] Service restarted successfully.`);
@@ -558,6 +559,8 @@ setInterval(async () => {
               addLog("WARNING", `[AUTO-HEAL] Server is unresponsive to queries for 45s. State set to CRASHED.`);
               serverState.status = "CRASHED";
               saveServerState();
+              
+              gregCommentOnEvent("Server unresponsive to API queries for 45 seconds. Status marked as CRASHED.");
               
               if (serverState.playersOnline === 0) {
                 addLog("ERROR", `[AUTO-HEAL] Server unresponsive with 0 active players. Rebooting server service...`);
@@ -600,6 +603,151 @@ setInterval(async () => {
   }
 }, 5000);
 
+async function sendChatToGame(message: string): Promise<void> {
+  try {
+    if (!frmAuthToken) {
+      await syncFRMToken();
+    }
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (frmAuthToken) {
+      headers["Authorization"] = `Bearer ${frmAuthToken}`;
+    }
+    const response = await fetch(`${FRM_BASE}/sendChatMessage`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ message }),
+      signal: AbortSignal.timeout(800)
+    });
+    if (!response.ok) {
+      console.error(`FRM sendChatMessage returned status ${response.status}`);
+    }
+  } catch (err: any) {
+    console.error("Failed to send chat message to game:", err.message);
+  }
+}
+
+async function gregAutoReply(playerName: string, messageText: string) {
+  const ai = getGemini();
+  const activeMods = mods.filter(m => m.installed).map(m => `${m.name} v${m.version}`).join(", ");
+  const backupSummary = `${getBackupFilesCount()} snapshots stored, auto-backup is ${serverState.autoBackupEnabled ? 'ENABLED' : 'DISABLED'}`;
+  
+  const contextPrompt = `
+You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
+You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
+Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯" when players are being silly.
+
+Current Server Context:
+- Server Status: ${serverState.status} (Version: ${serverState.version})
+- Active Session: ${serverState.sessionName}
+- Players Online: ${serverState.playersOnline} / ${serverState.maxPlayers}
+- Uptime: ${Math.floor(serverState.uptime / 3600)} hours, ${Math.floor((serverState.uptime % 3600) / 60)} minutes
+- Active SML Modding: ${serverState.moddingEnabled ? 'ENABLED' : 'DISABLED'}
+- Installed SML Mods: ${activeMods}
+- Backup Engine Status: ${backupSummary}
+
+A player named "${playerName}" just typed in the in-game chat: "${messageText}".
+Reply to them directly in your dry, sarcastic, veteran-sysadmin tone.
+IMPORTANT: Keep your response very short, compact, under 120 characters, so it fits in the in-game chat feed. Be brief and direct.
+  `;
+
+  let responseText = "";
+  if (!ai) {
+    const offlineReplies = [
+      `Grid alert: ${playerName}'s message ignored because Mascot Greg is in offline mode. ¯\\_(ツ)_/¯`,
+      `I would reply to "${messageText}", but Settings secrets are empty. Fix the API key.`,
+      `¯\\_(ツ)_/¯ Offline sandbox active. Stop building conveyor belts, the CPU is already crying.`
+    ];
+    responseText = offlineReplies[Math.floor(Math.random() * offlineReplies.length)];
+  } else {
+    try {
+      const response = await ai.models.generateContent({
+        model: serverState.geminiModel || "gemini-3.5-flash",
+        contents: [{ role: "user", parts: [{ text: `Player ${playerName} says: ${messageText}` }] }],
+        config: {
+          systemInstruction: contextPrompt,
+          temperature: 0.8,
+        }
+      });
+      responseText = response.text || "";
+    } catch (err: any) {
+      console.error("[AUTO-HEAL] Greg automated chat reply failed:", err.message);
+      responseText = `My neural subroutines hit a thermal barrier processing that. ¯\\_(ツ)_/¯`;
+    }
+  }
+
+  if (responseText) {
+    responseText = responseText.trim().replace(/\n/g, " ");
+    
+    inGameChats.push({
+      id: `greg_reply_${Date.now()}`,
+      sender: "Greg",
+      text: responseText,
+      timestamp: new Date().toISOString()
+    });
+    if (inGameChats.length > 150) inGameChats.shift();
+    saveChats();
+    
+    await sendChatToGame(responseText);
+  }
+}
+
+async function gregCommentOnEvent(eventDescription: string) {
+  const ai = getGemini();
+  
+  const contextPrompt = `
+You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
+You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
+Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯".
+
+Event to comment on: "${eventDescription}"
+
+Make a very brief, dry, sarcastic comment about this event (e.g. player joining, player leaving, or server outage/restart).
+IMPORTANT: Keep it under 100 characters. Get straight to the point.
+  `;
+
+  let responseText = "";
+  if (!ai) {
+    if (eventDescription.includes("joined")) {
+      responseText = `Player entered. Grid capacity warning: expect immediate spikes. ¯\\_(ツ)_/¯`;
+    } else if (eventDescription.includes("left")) {
+      responseText = `Player left. Grid stabilizing. Finally, some peace.`;
+    } else {
+      responseText = `System event: ${eventDescription}. Greg is offline. ¯\\_(ツ)_/¯`;
+    }
+  } else {
+    try {
+      const response = await ai.models.generateContent({
+        model: serverState.geminiModel || "gemini-3.5-flash",
+        contents: [{ role: "user", parts: [{ text: eventDescription }] }],
+        config: {
+          systemInstruction: contextPrompt,
+          temperature: 0.8,
+        }
+      });
+      responseText = response.text || "";
+    } catch (err) {
+      responseText = `Event recorded. Greg's subroutines are throttled. ¯\\_(ツ)_/¯`;
+    }
+  }
+
+  if (responseText) {
+    responseText = responseText.trim().replace(/\n/g, " ");
+    
+    inGameChats.push({
+      id: `greg_event_${Date.now()}`,
+      sender: "Greg",
+      text: responseText,
+      timestamp: new Date().toISOString()
+    });
+    if (inGameChats.length > 150) inGameChats.shift();
+    saveChats();
+    
+    await sendChatToGame(responseText);
+  }
+}
+
 // --- REAL-TIME LIVE CHAT & ONLINE PLAYERS ATTACHED POLLER ---
 let lastOnlinePlayers: string[] = [];
 
@@ -630,6 +778,7 @@ setInterval(async () => {
         });
         if (inGameChats.length > 150) inGameChats.shift();
         chatChanged = true;
+        gregCommentOnEvent(`${name} joined the server.`);
       }
     }
 
@@ -645,6 +794,7 @@ setInterval(async () => {
         });
         if (inGameChats.length > 150) inGameChats.shift();
         chatChanged = true;
+        gregCommentOnEvent(`${name} left the server.`);
       }
     }
 
@@ -678,6 +828,10 @@ setInterval(async () => {
           if (inGameChats.length > 150) inGameChats.shift();
           chatChanged = true;
           addLog("INFO", `LogChat: [${itemSender}]: ${itemText}`);
+          
+          if (itemSender !== "Greg" && itemSender !== "SERVER" && itemSender !== "System" && itemSender !== "InGamePlayer") {
+            gregAutoReply(itemSender, itemText);
+          }
         }
       }
     }
