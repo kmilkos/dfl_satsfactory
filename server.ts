@@ -84,6 +84,7 @@ let serverState = loadState("server_state.json", {
   moddingEnabled: true,
   geminiModel: "gemini-3.5-flash",
   autoHealEnabled: true,
+  adminPassword: "DaemonForge",
 });
 
 // Run a migration step to uninitialize session name if it was set to the default mock name
@@ -1146,6 +1147,47 @@ function getDynamicServerVersion(): string {
   }
 }
 
+const activeSessions = new Set<string>();
+
+function requireAdmin(req: any, res: any, next: any) {
+  const auth = req.headers["authorization"];
+  const token = auth && auth.startsWith("Bearer ") ? auth.substring(7) : null;
+  if (token && activeSessions.has(token)) {
+    next();
+  } else {
+    res.status(401).json({ error: "Unauthorized. Admin session required." });
+  }
+}
+
+app.post("/api/auth/login", (req, res) => {
+  const { password } = req.body;
+  const expected = (serverState as any).adminPassword || "DaemonForge";
+  if (password === expected) {
+    const token = "dfl-" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    activeSessions.add(token);
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ error: "Invalid admin password." });
+  }
+});
+
+app.post("/api/auth/validate", (req, res) => {
+  const { token } = req.body;
+  if (token && activeSessions.has(token)) {
+    res.json({ valid: true });
+  } else {
+    res.json({ valid: false });
+  }
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const { token } = req.body;
+  if (token) {
+    activeSessions.delete(token);
+  }
+  res.json({ success: true });
+});
+
 app.get("/api/server/status", async (req, res) => {
   syncModdingStateWithSystem();
   
@@ -1191,8 +1233,9 @@ app.get("/api/server/status", async (req, res) => {
   serverState.uptime = getServiceUptimeSeconds();
   saveServerState();
 
+  const { adminPassword, ...publicState } = serverState as any;
   res.json({
-    ...serverState,
+    ...publicState,
     nextAutoBackup: new Date(nextAutoBackupTime).toISOString(),
     hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey)
   });
@@ -1391,7 +1434,7 @@ const getUpdateLogs = () => {
   return list;
 };
 
-app.post("/api/server/action", (req, res) => {
+app.post("/api/server/action", requireAdmin, (req, res) => {
   const { action } = req.body;
   addLog("COMMAND", `dfl-panel execution: server action requested -> ${action}`);
 
@@ -1477,7 +1520,7 @@ app.post("/api/server/action", (req, res) => {
   res.json({ success: true, status: serverState.status });
 });
 
-app.post("/api/server/create-session", (req, res) => {
+app.post("/api/server/create-session", requireAdmin, (req, res) => {
   const { sessionName, biome } = req.body;
   if (!sessionName) {
     return res.status(400).json({ error: "Session name is required." });
@@ -1559,7 +1602,7 @@ app.get("/api/backups", (req, res) => {
   }
 });
 
-app.post("/api/backups/trigger", (req, res) => {
+app.post("/api/backups/trigger", requireAdmin, (req, res) => {
   if (serverState.status !== 'ONLINE') {
     return res.status(400).json({ error: "Server must be ONLINE to execute save file snapshot." });
   }
@@ -1598,7 +1641,7 @@ app.post("/api/backups/trigger", (req, res) => {
   }
 });
 
-app.post("/api/backups/config", (req, res) => {
+app.post("/api/backups/config", requireAdmin, (req, res) => {
   const { enabled, intervalMinutes } = req.body;
   serverState.autoBackupEnabled = enabled;
   serverState.backupIntervalMinutes = Number(intervalMinutes);
@@ -1609,7 +1652,7 @@ app.post("/api/backups/config", (req, res) => {
   res.json({ success: true, autoBackupEnabled: serverState.autoBackupEnabled, backupIntervalMinutes: serverState.backupIntervalMinutes });
 });
 
-app.post("/api/backups/restore", (req, res) => {
+app.post("/api/backups/restore", requireAdmin, (req, res) => {
   const { id } = req.body;
   const backupPath = path.join(BACKUP_DIR, id);
 
@@ -1791,7 +1834,7 @@ app.get("/api/mods/search", async (req, res) => {
   }
 });
 
-app.post("/api/mods/install", async (req, res) => {
+app.post("/api/mods/install", requireAdmin, async (req, res) => {
   const { id } = req.body;
   let mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -1867,7 +1910,7 @@ app.post("/api/mods/install", async (req, res) => {
   }
 });
 
-app.post("/api/mods/uninstall", async (req, res) => {
+app.post("/api/mods/uninstall", requireAdmin, async (req, res) => {
   const { id } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -1892,7 +1935,7 @@ app.post("/api/mods/uninstall", async (req, res) => {
   }
 });
 
-app.post("/api/mods/toggle", async (req, res) => {
+app.post("/api/mods/toggle", requireAdmin, async (req, res) => {
   const { id, enabled } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -1921,7 +1964,7 @@ app.post("/api/mods/toggle", async (req, res) => {
   }
 });
 
-app.post("/api/mods/toggle-profile", (req, res) => {
+app.post("/api/mods/toggle-profile", requireAdmin, (req, res) => {
   const { enabled } = req.body;
   
   // SML Modding enabled is inverse of Vanilla mode
@@ -1942,7 +1985,7 @@ app.post("/api/mods/toggle-profile", (req, res) => {
   addLog("INFO", `LogModding: Mod manager system overrides toggled. Active mod loads: ${enabled} (Vanilla: ${enabled ? 'OFF' : 'ON'}).`);
 });
 
-app.post("/api/server/auto-heal", (req, res) => {
+app.post("/api/server/auto-heal", requireAdmin, (req, res) => {
   const { enabled } = req.body;
   serverState.autoHealEnabled = enabled;
   saveServerState();
@@ -1960,7 +2003,7 @@ app.get("/api/mods/discovery", (req, res) => {
   });
 });
 
-app.post("/api/mods/discovery/sync", async (req, res) => {
+app.post("/api/mods/discovery/sync", requireAdmin, async (req, res) => {
   addLog("COMMAND", "dfl-daemon: Manually triggered Ficsit.app Mod Discovery database refresh.");
   await syncFicsitRegistry();
   res.json({
@@ -1977,7 +2020,7 @@ app.get("/api/mods/auto-install", (req, res) => {
   });
 });
 
-app.post("/api/mods/auto-install/add", (req, res) => {
+app.post("/api/mods/auto-install/add", requireAdmin, (req, res) => {
   const { id } = req.body;
   const mod = mods.find(m => m.id === id);
   if (!mod) {
@@ -2003,7 +2046,7 @@ app.post("/api/mods/auto-install/add", (req, res) => {
   res.json({ success: true, queue: autoInstallQueue });
 });
 
-app.post("/api/mods/auto-install/remove", (req, res) => {
+app.post("/api/mods/auto-install/remove", requireAdmin, (req, res) => {
   const { id } = req.body;
   if (id === "FicsitRemoteMonitoring") {
     return res.status(400).json({ error: "Ficsit Remote Monitoring is hardcoded in SML configuration and cannot be removed." });
@@ -2022,7 +2065,7 @@ app.post("/api/mods/auto-install/remove", (req, res) => {
 });
 
 // Quick Actions Endpoints
-app.post("/api/actions/validate", (req, res) => {
+app.post("/api/actions/validate", requireAdmin, (req, res) => {
   addLog("COMMAND", "dfl-daemon: Validate server files requested (steamcmd --verify).");
   addLog("INFO", "LogDaemonForge: Starting SteamCMD checksum verification on AppID 1690800.");
   addLog("INFO", "LogDaemonForge: Hashing manifest content chunk boundaries...");
@@ -2030,14 +2073,14 @@ app.post("/api/actions/validate", (req, res) => {
   res.json({ success: true, message: "Server files validation complete. All blocks green." });
 });
 
-app.post("/api/actions/clear-cache", (req, res) => {
+app.post("/api/actions/clear-cache", requireAdmin, (req, res) => {
   addLog("COMMAND", "dfl-daemon: Clear ficsit SML cache files requested.");
   addLog("WARNING", "ficsit-cli: Purging local metadata index & schema caches from ~/.config/ficsit/...");
   addLog("INFO", "ficsit-cli: Cleaned 14.8 MB of SML cached lockfiles and manifest metadata.");
   res.json({ success: true, message: "SML Cache successfully cleared. Manifest indices rebuilt." });
 });
 
-app.post("/api/actions/force-refresh", async (req, res) => {
+app.post("/api/actions/force-refresh", requireAdmin, async (req, res) => {
   addLog("COMMAND", "dfl-daemon: Daemon manual forced refresh requested by admin.");
   addLog("INFO", "LogDaemonForge: Syncing state buffers, resetting packet sockets.");
   frmAuthToken = "";
@@ -2279,7 +2322,7 @@ app.get("/api/docs/:id", (req, res) => {
   });
 });
 
-app.post("/api/greg/config-key", (req, res) => {
+app.post("/api/greg/config-key", requireAdmin, (req, res) => {
   const { apiKey, model } = req.body;
   if (apiKey !== undefined) {
     (serverState as any).geminiApiKey = apiKey || "";

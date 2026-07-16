@@ -8,9 +8,18 @@ import OperationsPanel from "./components/OperationsPanel";
 import DiagnosticsPanel from "./components/DiagnosticsPanel";
 import GregAssistant from "./components/GregAssistant";
 import DocumentationViewer from "./components/DocumentationViewer";
+import { 
+  Copy, Check, ExternalLink, Lock, Shield, Activity, Wifi, Cpu, Layers, Terminal, User, Server, Hash 
+} from "lucide-react";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("nodes");
+  
+  const [token, setToken] = useState<string | null>(localStorage.getItem("adminToken"));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [copiedText, setCopiedText] = useState(false);
   
   // Shared States
   const [serverStatus, setServerStatus] = useState<ServerState["status"]>("ONLINE");
@@ -134,39 +143,126 @@ export default function App() {
     }
   };
 
-  // Run initial sync & set up polling intervals
+  // -----------------------------------------------------------------------------
+  // API AUTH WRAPPER AND HANDLERS
+  // -----------------------------------------------------------------------------
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const headers = {
+      ...(options.headers || {}),
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
+    return fetch(url, { ...options, headers });
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordInput })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("adminToken", data.token);
+        setToken(data.token);
+        setIsLoggedIn(true);
+        setPasswordInput("");
+      } else {
+        const data = await res.json();
+        setLoginError(data.error || "Login failed.");
+      }
+    } catch (err) {
+      setLoginError("Failed to connect to authentication server.");
+    }
+  };
+
+  const handleLogout = async () => {
+    if (token) {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token })
+        });
+      } catch (err) {
+        console.error("Logout request failed:", err);
+      }
+    }
+    localStorage.removeItem("adminToken");
+    setToken(null);
+    setIsLoggedIn(false);
+  };
+
+  // Validate token on mount
+  useEffect(() => {
+    const validateToken = async () => {
+      if (token) {
+        try {
+          const res = await fetch("/api/auth/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token })
+          });
+          const data = await res.json();
+          if (data.valid) {
+            setIsLoggedIn(true);
+          } else {
+            localStorage.removeItem("adminToken");
+            setToken(null);
+            setIsLoggedIn(false);
+          }
+        } catch (err) {
+          console.error("Token validation failed:", err);
+        }
+      }
+    };
+    validateToken();
+  }, [token]);
+
+  // Set up polling intervals for public data
   useEffect(() => {
     fetchStatus();
-    fetchBackups();
     fetchMods();
-    fetchLogsAndChats();
     fetchTelemetry();
 
-    // Stats and Status Poll (Every 2 seconds)
+    // Poll status and telemetry every 3 seconds
     const statsInterval = setInterval(() => {
       fetchStatus();
       fetchTelemetry();
-    }, 2000);
-
-    // Logs and Chats Poll (Every 3 seconds)
-    const logsInterval = setInterval(() => {
-      fetchLogsAndChats();
     }, 3000);
 
     return () => {
       clearInterval(statsInterval);
-      clearInterval(logsInterval);
     };
   }, []);
 
+  // Set up polling intervals for admin data
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    fetchBackups();
+    fetchLogsAndChats();
+
+    const adminInterval = setInterval(() => {
+      fetchBackups();
+      fetchLogsAndChats();
+    }, 3000);
+
+    return () => {
+      clearInterval(adminInterval);
+    };
+  }, [isLoggedIn]);
+
   // -----------------------------------------------------------------------------
-  // API ACTION TRIGGERS
+  // API ACTION TRIGGERS (ADMIN ONLY ROUTES)
   // -----------------------------------------------------------------------------
 
   const handleServerAction = async (action: "START" | "STOP" | "RESTART" | "UPDATE") => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/server/action", {
+      const res = await fetchWithAuth("/api/server/action", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action })
@@ -185,7 +281,7 @@ export default function App() {
   const handleTriggerBackup = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/backups/trigger", { method: "POST" });
+      const res = await fetchWithAuth("/api/backups/trigger", { method: "POST" });
       if (!res.ok) {
         const errData = await res.json();
         alert(errData.error || "Failed to trigger save backup.");
@@ -202,7 +298,7 @@ export default function App() {
 
   const handleSaveBackupConfig = async (enabled: boolean, intervalMinutes: number) => {
     try {
-      await fetch("/api/backups/config", {
+      await fetchWithAuth("/api/backups/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled, intervalMinutes })
@@ -217,7 +313,7 @@ export default function App() {
   const handleRestoreBackup = async (id: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/backups/restore", {
+      const res = await fetchWithAuth("/api/backups/restore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
@@ -235,7 +331,7 @@ export default function App() {
 
   const handleDeleteBackup = async (id: string) => {
     try {
-      await fetch(`/api/backups/${id}`, { method: "DELETE" });
+      await fetchWithAuth(`/api/backups/${id}`, { method: "DELETE" });
       await fetchBackups();
       await fetchLogsAndChats();
     } catch (err) {
@@ -246,7 +342,7 @@ export default function App() {
   const handleInstallMod = async (id: string) => {
     setIsLoading(true);
     try {
-      await fetch("/api/mods/install", {
+      await fetchWithAuth("/api/mods/install", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
@@ -263,7 +359,7 @@ export default function App() {
   const handleUninstallMod = async (id: string) => {
     setIsLoading(true);
     try {
-      await fetch("/api/mods/uninstall", {
+      await fetchWithAuth("/api/mods/uninstall", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id })
@@ -280,7 +376,7 @@ export default function App() {
   const handleToggleMod = async (id: string, enabled: boolean) => {
     setIsLoading(true);
     try {
-      await fetch("/api/mods/toggle", {
+      await fetchWithAuth("/api/mods/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, enabled })
@@ -296,7 +392,7 @@ export default function App() {
 
   const handleToggleModdingProfile = async (enabled: boolean) => {
     try {
-      await fetch("/api/mods/toggle-profile", {
+      await fetchWithAuth("/api/mods/toggle-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled })
@@ -321,14 +417,269 @@ export default function App() {
     }
   };
 
+  if (!isLoggedIn) {
+    const handleCopy = () => {
+      navigator.clipboard.writeText("satisfactory.milkos.gr:7777");
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    };
+
+    const statusColors = {
+      OFFLINE: "bg-zinc-600 text-zinc-400 border-zinc-500",
+      STARTING: "bg-amber-500/20 text-amber-500 border-amber-600 animate-pulse",
+      ONLINE: "bg-emerald-500/20 text-emerald-400 border-emerald-600",
+      UPDATING: "bg-blue-500/20 text-blue-400 border-blue-600 animate-pulse",
+      CRASHED: "bg-rose-500/20 text-rose-400 border-rose-600",
+    };
+
+    const activeMods = modsList.filter(m => m.installed);
+
+    return (
+      <div className="w-screen min-h-screen bg-zinc-950 font-sans flex flex-col justify-between overflow-x-hidden text-slate-100 selection:bg-orange-500/30 selection:text-orange-400">
+        
+        {/* Header */}
+        <header className="relative w-full h-20 bg-zinc-950 border-b border-slate-900 flex items-center justify-between px-8 shadow-md shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 bg-zinc-900 border border-slate-800 rounded flex items-center justify-center shadow-lg">
+              <Server className="w-5 h-5 text-orange-500" />
+            </div>
+            <div className="text-left">
+              <h1 className="text-sm font-mono font-bold tracking-wider text-slate-200">DAEMONFORGE</h1>
+              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Public Server Portal</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider">Status:</span>
+            <div className={`px-3 py-1 rounded border text-[11px] font-mono font-bold tracking-tight ${statusColors[serverStatus]}`}>
+              {serverStatus}
+            </div>
+          </div>
+        </header>
+
+        {/* Viewport content */}
+        <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-8 flex items-center justify-center">
+          <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* Left side: Telemetry & Installed Mods list */}
+            <div className="lg:col-span-7 space-y-6 flex flex-col justify-between">
+              
+              {/* Telemetry card */}
+              <div className="bg-zinc-900/40 border border-slate-800/80 rounded-xl p-6 shadow-xl flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 pb-3 border-b border-slate-800/60 mb-4">
+                    <Activity className="w-4 h-4 text-orange-500 animate-pulse" />
+                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">Live Telemetry</h2>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="bg-zinc-950/60 border border-slate-900 rounded-lg p-3 text-left">
+                      <p className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Active Session</p>
+                      <p className="text-xs font-bold text-slate-200 truncate mt-1" title={serverInfo.sessionName}>
+                        {serverInfo.sessionName || "None"}
+                      </p>
+                    </div>
+
+                    <div className="bg-zinc-950/60 border border-slate-900 rounded-lg p-3 text-left">
+                      <p className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Pioneers Online</p>
+                      <p className="text-xs font-bold text-slate-200 mt-1 flex items-center">
+                        <User className="w-3.5 h-3.5 text-emerald-500 mr-1 shrink-0" />
+                        {serverInfo.playersOnline} / {serverInfo.maxPlayers}
+                      </p>
+                    </div>
+
+                    <div className="bg-zinc-950/60 border border-slate-900 rounded-lg p-3 text-left">
+                      <p className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Server Build</p>
+                      <p className="text-xs font-bold text-slate-200 mt-1 truncate" title={serverInfo.version}>
+                        {serverInfo.version ? serverInfo.version.split(" ")[0] : "v1.0.0"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Telemetry metrics */}
+                <div className="space-y-4">
+                  <div className="bg-zinc-950/60 border border-slate-900 rounded-lg p-4 text-left">
+                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mb-2 font-bold uppercase tracking-wider">
+                      <span>Server Resources</span>
+                      <span className="text-slate-400">
+                        CPU: {telemetry.cpuUsage.toFixed(1)}% | RAM: {telemetry.ramUsageGb.toFixed(2)} GB
+                      </span>
+                    </div>
+                    <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden flex">
+                      <div 
+                        className="bg-orange-500 transition-all duration-500" 
+                        style={{ width: `${Math.min(telemetry.cpuUsage, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Active Pioneers online */}
+                  <div className="bg-zinc-950/60 border border-slate-900 rounded-lg p-4 text-left">
+                    <p className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider mb-2">Connected Pioneers</p>
+                    {telemetry.players.length === 0 ? (
+                      <p className="text-xs text-slate-600 font-mono italic">No Pioneers active in-game currently.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {telemetry.players.map(p => (
+                          <span key={p.name} className="px-2 py-1 bg-zinc-900 border border-slate-800 text-slate-300 text-[10px] font-mono rounded flex items-center">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></span>
+                            @{p.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* SML Mods Card */}
+              <div className="bg-zinc-900/40 border border-slate-800/80 rounded-xl p-6 shadow-xl text-left">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800/60 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Layers className="w-4 h-4 text-orange-500" />
+                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">Installed SML Mods</h2>
+                  </div>
+                  <span className="bg-orange-500/10 border border-orange-500/30 text-orange-400 px-2 py-0.5 rounded text-[9px] font-mono font-bold">
+                    {activeMods.length} PACKAGES
+                  </span>
+                </div>
+
+                <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {activeMods.length === 0 ? (
+                    <p className="text-xs text-slate-600 font-mono italic">No SML mods active. Running Vanilla configuration.</p>
+                  ) : (
+                    activeMods.map(m => (
+                      <div key={m.id} className="p-2.5 bg-zinc-950/60 border border-slate-900 rounded-lg flex items-center justify-between gap-4">
+                        <div className="min-w-0 text-left">
+                          <h3 className="text-xs font-bold text-slate-200 truncate">{m.name}</h3>
+                          <p className="text-[10px] text-slate-500 truncate mt-0.5">{m.description || "No description."}</p>
+                        </div>
+                        <span className="bg-zinc-900 px-2 py-1 rounded text-[9px] font-mono text-slate-400 border border-slate-800 shrink-0">
+                          v{m.version}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right side: Copy connection info & Login Form */}
+            <div className="lg:col-span-5 space-y-6 flex flex-col justify-between">
+              
+              {/* Connection Card */}
+              <div className="bg-zinc-900/40 border border-slate-800/80 rounded-xl p-6 shadow-xl text-left">
+                <div className="flex items-center space-x-2 pb-3 border-b border-slate-800/60 mb-4">
+                  <ExternalLink className="w-4 h-4 text-orange-500" />
+                  <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">Connection Details</h2>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Server IP Address</label>
+                    <div className="mt-1 flex space-x-2">
+                      <div className="flex-1 bg-zinc-950 border border-slate-900 px-3 py-2 rounded font-mono text-xs text-slate-300 select-all truncate">
+                        satisfactory.milkos.gr
+                      </div>
+                      <button 
+                        onClick={handleCopy}
+                        className="px-3 bg-zinc-900 border border-slate-800 text-slate-300 rounded hover:bg-zinc-800 transition-colors flex items-center justify-center shrink-0 cursor-pointer text-xs font-mono font-bold animate-transition"
+                      >
+                        {copiedText ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Query Port</label>
+                      <div className="mt-1 bg-zinc-950 border border-slate-900 px-3 py-2 rounded font-mono text-xs text-slate-300">
+                        7777 UDP
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">SML Modding Status</label>
+                      <div className="mt-1 bg-zinc-950 border border-slate-900 px-3 py-2 rounded font-mono text-xs text-slate-300 flex items-center">
+                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${serverInfo.moddingEnabled ? "bg-orange-500 shadow-[0_0_8px_#f97316]" : "bg-zinc-500"}`}></span>
+                        {serverInfo.moddingEnabled ? "MODDED (SML)" : "VANILLA"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Login Card */}
+              <div className="bg-zinc-900/40 border border-slate-800/80 rounded-xl p-6 shadow-xl text-left flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center space-x-2 pb-3 border-b border-slate-800/60 mb-4">
+                    <Lock className="w-4 h-4 text-orange-500" />
+                    <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">Admin Console Access</h2>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 font-mono leading-relaxed mb-6">
+                    Enter the administration console password configured in your server state parameters to access settings, system controls, backups, and live commands.
+                  </p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  {loginError && (
+                    <div className="p-3 bg-rose-955 border border-rose-900/40 text-rose-400 text-xs font-mono rounded-lg">
+                      Error: {loginError}
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-slate-500 uppercase font-bold tracking-wider">Admin Password</label>
+                    <input 
+                      type="password"
+                      placeholder="Enter administrator password..."
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-950 border border-slate-900 rounded font-mono text-xs text-slate-200 placeholder-slate-700 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full py-2 bg-orange-500 text-zinc-950 hover:bg-orange-600 transition-colors font-mono font-bold text-xs rounded shadow-lg cursor-pointer flex items-center justify-center space-x-2"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>AUTHENTICATE BRIDGE</span>
+                  </button>
+                </form>
+              </div>
+
+            </div>
+
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="w-full h-10 border-t border-slate-900 bg-zinc-950 flex items-center justify-between px-6 shrink-0 text-[10px] font-mono text-slate-500">
+          <div>
+            BRAND DEPLOYMENT: <span className="text-slate-400 font-bold uppercase">DaemonForge Labs</span>
+          </div>
+          <div>
+            "Orchestrating digital worlds" | Node v24.x LTS (Active)
+          </div>
+        </footer>
+
+      </div>
+    );
+  }
+
   return (
-    <div className="w-screen min-h-screen bg-zinc-950 font-sans flex flex-col overflow-x-hidden">
+    <div className="w-screen min-h-screen bg-zinc-955 font-sans flex flex-col overflow-x-hidden text-slate-100">
       
       {/* Sticky Command Bridge Header navigation */}
       <CommandBridge 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         serverStatus={serverStatus} 
+        onLogout={handleLogout}
       />
 
       {/* Main viewport Container */}

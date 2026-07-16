@@ -5,9 +5,10 @@ interface CommandBridgeProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   serverStatus: 'OFFLINE' | 'STARTING' | 'ONLINE' | 'UPDATING' | 'CRASHED';
+  onLogout?: () => void;
 }
 
-export default function CommandBridge({ activeTab, setActiveTab, serverStatus }: CommandBridgeProps) {
+export default function CommandBridge({ activeTab, setActiveTab, serverStatus, onLogout }: CommandBridgeProps) {
   // Map status to visual indicators
   const statusColors = {
     OFFLINE: "bg-zinc-600 text-zinc-400 border-zinc-500",
@@ -150,6 +151,15 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus }:
         <div className={`ml-4 px-3 py-1 rounded border text-[11px] font-mono font-bold tracking-tight ${statusColors[serverStatus]}`}>
           {serverStatus}
         </div>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="ml-4 px-3 py-1.5 rounded border border-rose-900 bg-rose-950/20 text-rose-400 hover:bg-rose-950/50 transition-colors text-[10px] font-mono font-bold cursor-pointer"
+          >
+            LOGOUT
+          </button>
+        )}
       </nav>
       
     </header>
