@@ -158,7 +158,27 @@ export default function OperationsPanel({
   const [isPinging, setIsPinging] = useState(false);
   const [pingStatus, setPingStatus] = useState<string | null>(null);
 
-  const [autoHealActive, setAutoHealActive] = useState(true);
+  const [autoHealActive, setAutoHealActive] = useState(serverInfo.autoHealEnabled !== false);
+
+  const handleToggleAutoHeal = async (enabled: boolean) => {
+    setAutoHealActive(enabled);
+    try {
+      const response = await fetch("/api/server/auto-heal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled })
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update auto-heal status.");
+      }
+      if (onRefreshStatus) {
+        await onRefreshStatus();
+      }
+    } catch (err) {
+      console.error(err);
+      setAutoHealActive(!enabled);
+    }
+  };
 
   // Local state for SML status change restart warning
   const [showRestartWarning, setShowRestartWarning] = useState(false);
@@ -1597,7 +1617,7 @@ export default function OperationsPanel({
                   {autoHealActive ? "ACTIVE" : "STANDBY"}
                 </span>
                 <button
-                  onClick={() => setAutoHealActive(!autoHealActive)}
+                  onClick={() => handleToggleAutoHeal(!autoHealActive)}
                   className={`w-10 h-5 rounded-full p-0.5 transition-all cursor-pointer flex ${autoHealActive ? "bg-orange-500 justify-end" : "bg-slate-800 justify-start"}`}
                 >
                   <span className="w-4 h-4 rounded-full bg-slate-100 shadow"></span>

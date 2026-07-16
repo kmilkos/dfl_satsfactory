@@ -83,6 +83,7 @@ let serverState = loadState("server_state.json", {
   backupIntervalMinutes: 15,
   moddingEnabled: true,
   geminiModel: "gemini-2.5-flash",
+  autoHealEnabled: true,
 });
 
 // Run a migration step to uninitialize session name if it was set to the default mock name
@@ -461,8 +462,10 @@ function addLog(level: 'INFO' | 'WARNING' | 'ERROR' | 'COMMAND', message: string
 
 // Automated Backups timer simulator
 let nextAutoBackupTime = Date.now() + 15 * 60 * 1000;
+let lastAutoHealCheck = 0;
+let consecutiveUnresponsiveCount = 0;
 
-setInterval(() => {
+setInterval(async () => {
   // If uptime tick
   if (serverState.status === 'ONLINE') {
     serverState.uptime += 5;
@@ -495,6 +498,99 @@ setInterval(() => {
       }
       
       nextAutoBackupTime = Date.now() + serverState.backupIntervalMinutes * 60 * 1000;
+    }
+  }
+
+  // Automated Recovery Daemon Loop
+  if (serverState.autoHealEnabled) {
+    const now = Date.now();
+    if (now - lastAutoHealCheck >= 15000) { // Check every 15 seconds
+      lastAutoHealCheck = now;
+      
+      try {
+        const serviceActive = getServiceActiveState();
+        const uptime = getServiceUptimeSeconds();
+        
+        // 1. If service is failed or should be running but is offline
+        if (serviceActive === "failed" || (serverState.status === "ONLINE" && serviceActive !== "active")) {
+          addLog("ERROR", `[AUTO-HEAL] Dedicated server service is in state '${serviceActive}' (expected: active). Recovering...`);
+          exec("systemctl restart satisfactory", (err, stdout, stderr) => {
+            if (err) addLog("ERROR", `[AUTO-HEAL] Restart failed: ${stderr || err.message}`);
+            else addLog("INFO", `[AUTO-HEAL] Service restarted successfully.`);
+          });
+          consecutiveUnresponsiveCount = 0;
+        }
+        // 2. If running, verify responsiveness
+        else if (serviceActive === "active" && uptime > 120) {
+          let isResponsive = false;
+          try {
+            // Fast ping query check
+            const stateRes = await queryNativeAPI("QueryServerState");
+            if (stateRes?.data?.serverGameState) {
+              isResponsive = true;
+            }
+          } catch (e) {
+            // Fallback check
+            try {
+              const frmPlayers = await fetchFromFRM("/getPlayer");
+              if (Array.isArray(frmPlayers)) {
+                isResponsive = true;
+              }
+            } catch (err) {
+              isResponsive = false;
+            }
+          }
+          
+          if (isResponsive) {
+            consecutiveUnresponsiveCount = 0;
+            if (serverState.status === "CRASHED") {
+              serverState.status = "ONLINE";
+              saveServerState();
+            }
+          } else {
+            consecutiveUnresponsiveCount++;
+            if (consecutiveUnresponsiveCount >= 3) { // 45 seconds of unresponsiveness
+              addLog("WARNING", `[AUTO-HEAL] Server is unresponsive to queries for 45s. State set to CRASHED.`);
+              serverState.status = "CRASHED";
+              saveServerState();
+              
+              if (serverState.playersOnline === 0) {
+                addLog("ERROR", `[AUTO-HEAL] Server unresponsive with 0 active players. Rebooting server service...`);
+                exec("systemctl restart satisfactory", (err, stdout, stderr) => {
+                  if (err) addLog("ERROR", `[AUTO-HEAL] Automated reboot failed: ${stderr || err.message}`);
+                  else addLog("INFO", `[AUTO-HEAL] Server service reboot completed successfully.`);
+                });
+              } else {
+                addLog("WARNING", `[AUTO-HEAL] Service reboot skipped because player count is ${serverState.playersOnline}.`);
+              }
+              consecutiveUnresponsiveCount = 0;
+            }
+          }
+        }
+        
+        // 3. Memory leak detection (usage > 12 GB with 0 players)
+        if (serviceActive === "active") {
+          try {
+            const properties = execSync("systemctl show satisfactory --property=MemoryCurrent").toString().trim();
+            const match = properties.match(/MemoryCurrent=(\d+)/);
+            if (match) {
+              const memoryBytes = parseInt(match[1], 10);
+              const memoryGb = memoryBytes / (1024 * 1024 * 1024);
+              if (memoryGb > 12 && serverState.playersOnline === 0) {
+                addLog("WARNING", `[AUTO-HEAL] Memory leak detected. Current usage: ${memoryGb.toFixed(2)} GB (threshold: 12.00 GB). Recycling service...`);
+                exec("systemctl restart satisfactory", (err, stdout, stderr) => {
+                  if (err) addLog("ERROR", `[AUTO-HEAL] Recycling failed: ${stderr || err.message}`);
+                  else addLog("INFO", `[AUTO-HEAL] Server service recycled to clear memory leaks.`);
+                });
+              }
+            }
+          } catch (memErr) {
+            // Suppress properties query errors
+          }
+        }
+      } catch (e: any) {
+        console.error("[AUTO-HEAL] Loop error:", e.message);
+      }
     }
   }
 }, 5000);
@@ -1660,7 +1756,14 @@ app.post("/api/mods/toggle-profile", (req, res) => {
   serverState.moddingEnabled = enabled;
   saveServerState();
   addLog("INFO", `LogModding: Mod manager system overrides toggled. Active mod loads: ${enabled} (Vanilla: ${enabled ? 'OFF' : 'ON'}).`);
-  res.json({ success: true, moddingEnabled: serverState.moddingEnabled });
+});
+
+app.post("/api/server/auto-heal", (req, res) => {
+  const { enabled } = req.body;
+  serverState.autoHealEnabled = enabled;
+  saveServerState();
+  addLog("INFO", `LogDaemonForge: Automated recovery loop state updated: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+  res.json({ success: true, autoHealEnabled: serverState.autoHealEnabled });
 });
 
 // --- MOD DISCOVERY & AUTO-INSTALL API ENDPOINTS ---

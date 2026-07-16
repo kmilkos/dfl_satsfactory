@@ -10,6 +10,7 @@ export interface ServerState {
   moddingEnabled: boolean;
   hasGeminiKey?: boolean;
   geminiModel?: string;
+  autoHealEnabled?: boolean;
 }
 
 export interface Backup {
