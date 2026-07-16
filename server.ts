@@ -2207,7 +2207,7 @@ app.get("/api/chat", (req, res) => {
   res.json(inGameChats);
 });
 
-app.post("/api/chat", (req, res) => {
+app.post("/api/chat", async (req, res) => {
   const { sender, text } = req.body;
   if (!text) return res.status(400).json({ error: "Text is empty." });
 
@@ -2221,6 +2221,12 @@ app.post("/api/chat", (req, res) => {
   inGameChats.push(newMsg);
   saveChats();
   addLog("INFO", `LogChat: [${newMsg.sender}]: ${newMsg.text}`);
+
+  // Broadcast message to live in-game server chat
+  await sendChatToGame(text);
+
+  // Trigger Greg auto-reply to User_Manager's message
+  gregAutoReply(newMsg.sender, text);
 
   res.json(newMsg);
 });
