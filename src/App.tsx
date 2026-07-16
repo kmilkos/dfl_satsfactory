@@ -419,9 +419,42 @@ export default function App() {
 
   if (!isLoggedIn) {
     const handleCopy = () => {
-      navigator.clipboard.writeText("satisfactory.milkos.gr:7777");
-      setCopiedText(true);
-      setTimeout(() => setCopiedText(false), 2000);
+      const address = "satisfactory.milkos.gr:7777";
+      
+      const performFallbackCopy = (text: string) => {
+        try {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          const successful = document.execCommand("copy");
+          document.body.removeChild(textarea);
+          if (successful) {
+            setCopiedText(true);
+            setTimeout(() => setCopiedText(false), 2000);
+          } else {
+            console.error("Fallback clipboard copy failed");
+          }
+        } catch (err) {
+          console.error("Fallback clipboard copy threw error:", err);
+        }
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(address)
+          .then(() => {
+            setCopiedText(true);
+            setTimeout(() => setCopiedText(false), 2000);
+          })
+          .catch(() => {
+            performFallbackCopy(address);
+          });
+      } else {
+        performFallbackCopy(address);
+      }
     };
 
     const statusColors = {
