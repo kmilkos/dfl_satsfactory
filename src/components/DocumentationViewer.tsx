@@ -14,7 +14,8 @@ export default function DocumentationViewer({ isLoading: serverLoading }: Docume
   const docs = [
     { id: "server-configuration", title: "Dedicated Server Setup", desc: "SteamCMD scripts, configurations, and network ports." },
     { id: "cli-administration", title: "SML Modding (ficsit-cli)", desc: "Headless mod profiles, SML installation, and updates." },
-    { id: "remote-monitoring", title: "Remote Control & Telemetry", desc: "Ficsit Remote Monitoring REST/WebSocket configurations." }
+    { id: "remote-monitoring", title: "Remote Control & Telemetry", desc: "Ficsit Remote Monitoring REST/WebSocket configurations." },
+    { id: "cloudflare-setup", title: "Cloudflare & Tunnels", desc: "Setting up DNS proxy bypasses and cloudflared tunnels." }
   ];
 
   useEffect(() => {
@@ -163,7 +164,7 @@ export default function DocumentationViewer({ isLoading: serverLoading }: Docume
         </div>
         <div className="text-xs font-mono text-slate-400 mt-2 md:mt-0 flex items-center bg-zinc-900 border border-slate-800 px-3 py-1.5 rounded">
           <FileText className="w-4 h-4 text-orange-500 mr-2" />
-          Documentation Index: <span className="text-orange-500 ml-1 font-bold">3 MANIFESTS</span>
+          Documentation Index: <span className="text-orange-500 ml-1 font-bold">{docs.length} MANIFESTS</span>
         </div>
       </div>
 
