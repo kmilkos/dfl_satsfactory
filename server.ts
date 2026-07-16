@@ -682,7 +682,7 @@ IMPORTANT: Keep your response very short, compact, under 120 characters, so it f
     
     inGameChats.push({
       id: `greg_reply_${Date.now()}`,
-      sender: "Greg",
+      sender: "Mascot_Greg",
       text: responseText,
       timestamp: new Date().toISOString()
     });
@@ -737,7 +737,7 @@ IMPORTANT: Keep it under 100 characters. Get straight to the point.
     
     inGameChats.push({
       id: `greg_event_${Date.now()}`,
-      sender: "Greg",
+      sender: "Mascot_Greg",
       text: responseText,
       timestamp: new Date().toISOString()
     });
@@ -807,7 +807,7 @@ setInterval(async () => {
     }
 
     // 2. Fetch live chats from FRM mod
-    const rawChat = await fetchFromFRM("/getChat");
+    const rawChat = await fetchFromFRM("/getChatMessages");
     if (Array.isArray(rawChat)) {
       for (const item of rawChat) {
         const itemText = item.text || item.Text || item.Message || item.message || item.msg;
@@ -819,17 +819,21 @@ setInterval(async () => {
           msg.sender === itemSender
         );
         if (!alreadyExists) {
+          const parsedTime = typeof itemTime === 'number' && itemTime < 2000000000 
+            ? new Date(itemTime * 1000).toISOString() 
+            : new Date(itemTime).toISOString();
+
           inGameChats.push({
             id: `frm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             sender: itemSender,
             text: itemText,
-            timestamp: new Date(itemTime).toISOString()
+            timestamp: parsedTime
           });
           if (inGameChats.length > 150) inGameChats.shift();
           chatChanged = true;
           addLog("INFO", `LogChat: [${itemSender}]: ${itemText}`);
           
-          if (itemSender !== "Greg" && itemSender !== "SERVER" && itemSender !== "System" && itemSender !== "InGamePlayer") {
+          if (itemSender !== "Mascot_Greg" && itemSender !== "Greg" && itemSender !== "SERVER" && itemSender !== "System" && itemSender !== "InGamePlayer") {
             gregAutoReply(itemSender, itemText);
           }
         }
