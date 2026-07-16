@@ -612,14 +612,30 @@ async function sendChatToGame(message: string): Promise<void> {
       "Content-Type": "application/json"
     };
     if (frmAuthToken) {
-      headers["Authorization"] = `Bearer ${frmAuthToken}`;
+      headers["X-FRM-Authorization"] = frmAuthToken;
     }
-    const response = await fetch(`${FRM_BASE}/sendChatMessage`, {
+    let response = await fetch(`${FRM_BASE}/sendChatMessage`, {
       method: "POST",
       headers,
       body: JSON.stringify({ message }),
       signal: AbortSignal.timeout(800)
     });
+    if (response.status === 401 || response.status === 403) {
+      frmAuthToken = "";
+      await syncFRMToken();
+      const retryHeaders: Record<string, string> = {
+        "Content-Type": "application/json"
+      };
+      if (frmAuthToken) {
+        retryHeaders["X-FRM-Authorization"] = frmAuthToken;
+      }
+      response = await fetch(`${FRM_BASE}/sendChatMessage`, {
+        method: "POST",
+        headers: retryHeaders,
+        body: JSON.stringify({ message }),
+        signal: AbortSignal.timeout(800)
+      });
+    }
     if (!response.ok) {
       console.error(`FRM sendChatMessage returned status ${response.status}`);
     }
