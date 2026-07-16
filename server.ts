@@ -2381,6 +2381,16 @@ Answer the user's technical questions, troubleshoot server crashes, or comment o
     return res.json({ text });
   }
 
+  const AVAILABLE_GEMINI_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-3.5-pro",
+    "gemini-3.1-flash",
+    "gemini-3.1-pro-preview",
+    "gemini-2.0-flash",
+    "gemini-2.0-pro-exp",
+    "gemini-2.0-flash-thinking-exp"
+  ];
+
   try {
     // Map messages array to Gemini format
     const contents = messages.map((m: any) => {
@@ -2390,16 +2400,59 @@ Answer the user's technical questions, troubleshoot server crashes, or comment o
       };
     });
 
-    const response = await ai.models.generateContent({
-      model: (serverState as any).geminiModel || "gemini-3.5-flash",
-      contents,
-      config: {
-        systemInstruction: contextPrompt,
-        temperature: 0.8,
-      }
-    });
+    let attempts = 0;
+    let modelToUse = (serverState as any).geminiModel || "gemini-3.5-flash";
+    let lastError: any = null;
+    let response: any = null;
 
-    res.json({ text: response.text });
+    while (attempts < 3) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelToUse,
+          contents,
+          config: {
+            systemInstruction: contextPrompt,
+            temperature: 0.8,
+          }
+        });
+        
+        // If we switched model successfully, save it so it persists!
+        if (modelToUse !== (serverState as any).geminiModel) {
+          (serverState as any).geminiModel = modelToUse;
+          saveServerState();
+        }
+        break;
+      } catch (error: any) {
+        lastError = error;
+        const errText = (error.toString() + " " + (error.message || "")).toLowerCase();
+        const is503OrRateLimit = 
+          errText.includes("503") || 
+          errText.includes("high demand") || 
+          errText.includes("resource_exhausted") || 
+          errText.includes("rate limit") ||
+          errText.includes("quota");
+        
+        if (is503OrRateLimit) {
+          attempts++;
+          // Find another model to switch to
+          const currentIndex = AVAILABLE_GEMINI_MODELS.indexOf(modelToUse);
+          const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % AVAILABLE_GEMINI_MODELS.length;
+          const fallbackModel = AVAILABLE_GEMINI_MODELS[nextIndex];
+          
+          addLog("WARNING", `LogDaemonForge: Gemini model '${modelToUse}' is experiencing high demand (503/rate limit). Auto-switching model to '${fallbackModel}' and retrying.`);
+          modelToUse = fallbackModel;
+        } else {
+          // Break immediately for other errors (e.g. invalid API key)
+          break;
+        }
+      }
+    }
+
+    if (response) {
+      res.json({ text: response.text });
+    } else {
+      throw lastError || new Error("All fallback models exhausted.");
+    }
   } catch (error: any) {
     console.error("Gemini API error in Greg chat:", error);
     res.json({ text: `My neural subroutines hit a thermal barrier: ${error.message}. ¯\\_(ツ)_/¯ Suggest checking the terminal logs.` });
