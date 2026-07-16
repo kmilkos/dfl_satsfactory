@@ -221,7 +221,7 @@ export default function GregAssistant({
                 disabled={isSavingKey}
                 className="w-full px-2.5 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-[10px] text-slate-300 focus:outline-none focus:border-orange-500 cursor-pointer"
               >
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
+                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Fast)</option>
                 <option value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</option>
                 <option value="gemini-1.5-pro">Gemini 1.5 Pro (Analytical)</option>
               </select>

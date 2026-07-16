@@ -82,7 +82,7 @@ let serverState = loadState("server_state.json", {
   autoBackupEnabled: true,
   backupIntervalMinutes: 15,
   moddingEnabled: true,
-  geminiModel: "gemini-2.0-flash",
+  geminiModel: "gemini-3.5-flash",
   autoHealEnabled: true,
 });
 
@@ -92,8 +92,8 @@ if (serverState.sessionName === "DaemonForge_Main_World") {
   saveServerState();
 }
 
-if (serverState.geminiModel === "gemini-2.5-flash" || (serverState as any).geminiModel === "gemini-2.5-flash") {
-  serverState.geminiModel = "gemini-2.0-flash";
+if (serverState.geminiModel === "gemini-2.5-flash" || serverState.geminiModel === "gemini-2.0-flash" || (serverState as any).geminiModel === "gemini-2.5-flash") {
+  serverState.geminiModel = "gemini-3.5-flash";
   saveServerState();
 }
 
@@ -2104,7 +2104,7 @@ app.post("/api/greg/config-key", (req, res) => {
   }
   saveServerState();
   aiClient = null;
-  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-2.0-flash"}. Resetting Greg AI client.`);
+  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-3.5-flash"}. Resetting Greg AI client.`);
   res.json({ 
     success: true, 
     hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey),
@@ -2163,7 +2163,7 @@ Answer the user's technical questions, troubleshoot server crashes, or comment o
     });
 
     const response = await ai.models.generateContent({
-      model: (serverState as any).geminiModel || "gemini-2.0-flash",
+      model: (serverState as any).geminiModel || "gemini-3.5-flash",
       contents,
       config: {
         systemInstruction: contextPrompt,
