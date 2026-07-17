@@ -2307,7 +2307,7 @@ app.get("/api/logs", (req, res) => {
 // 7. Read Dynamic Markdown Documentation
 app.get("/api/docs/:id", (req, res) => {
   const docId = req.params.id;
-  const safeDocIds = ["server-configuration", "cli-administration", "remote-monitoring", "cloudflare-setup"];
+  const safeDocIds = ["server-configuration", "cli-administration", "remote-monitoring", "cloudflare-setup", "antigravity-cli-setup"];
   
   if (!safeDocIds.includes(docId)) {
     return res.status(404).json({ error: "Document not found." });

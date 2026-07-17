@@ -15,7 +15,8 @@ export default function DocumentationViewer({ isLoading: serverLoading }: Docume
     { id: "server-configuration", title: "Dedicated Server Setup", desc: "SteamCMD scripts, configurations, and network ports." },
     { id: "cli-administration", title: "SML Modding (ficsit-cli)", desc: "Headless mod profiles, SML installation, and updates." },
     { id: "remote-monitoring", title: "Remote Control & Telemetry", desc: "Ficsit Remote Monitoring REST/WebSocket configurations." },
-    { id: "cloudflare-setup", title: "Cloudflare & Tunnels", desc: "Setting up DNS proxy bypasses and cloudflared tunnels." }
+    { id: "cloudflare-setup", title: "Cloudflare & Tunnels", desc: "Setting up DNS proxy bypasses and cloudflared tunnels." },
+    { id: "antigravity-cli-setup", title: "Antigravity CLI & Storage", desc: "Installation instructions and host network folder bind mounting." }
   ];
 
   useEffect(() => {
