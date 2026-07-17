@@ -4,6 +4,59 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-data-mono: "JetBrains Mono", monospace;
+  --font-headline-lg: "Space Grotesk", sans-serif;
+  --font-label-caps: "JetBrains Mono", monospace;
+  --font-display-lg: "Space Grotesk", sans-serif;
+  --font-body-md: "Inter", sans-serif;
+
+  --color-surface: #111317;
+  --color-on-secondary: #3c2f00;
+  --color-surface-dim: #111317;
+  --color-on-tertiary-fixed-variant: #004f58;
+  --color-secondary-container: #eec200;
+  --color-outline: #a38d7a;
+  --color-on-error: #690005;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-tertiary-fixed: #9cf0ff;
+  --color-primary-fixed: #ffdcbe;
+  --color-surface-bright: #37393d;
+  --color-surface-tint: #ffb870;
+  --color-on-tertiary: #00363d;
+  --color-on-primary: #4a2800;
+  --color-secondary-fixed: #ffe083;
+  --color-inverse-primary: #8b5000;
+  --color-secondary: #ffe083;
+  --color-on-background: #e2e2e7;
+  --color-outline-variant: #554434;
+  --color-on-surface-variant: #dbc2ad;
+  --color-on-error-container: #ffdad6;
+  --color-surface-container: #1e2023;
+  --color-primary: #ffc081;
+  --color-surface-container-low: #1a1c1f;
+  --color-inverse-on-surface: #2e3034;
+  --color-on-secondary-fixed: #231b00;
+  --color-tertiary-container: #00c2d8;
+  --color-tertiary-fixed-dim: #00daf3;
+  --color-on-tertiary-fixed: #001f24;
+  --color-surface-variant: #333539;
+  --color-surface-container-lowest: #0c0e12;
+  --color-inverse-surface: #e2e2e7;
+  --color-primary-fixed-dim: #ffb870;
+  --color-surface-container-high: #282a2e;
+  --color-primary-container: #ff9800;
+  --color-background: #111317;
+  --color-on-surface: #e2e2e7;
+  --color-on-secondary-container: #645000;
+  --color-on-primary-container: #653900;
+  --color-surface-container-highest: #333539;
+  --color-secondary-fixed-dim: #eec200;
+  --color-on-secondary-fixed-variant: #574500;
+  --color-tertiary: #00e0fa;
+  --color-on-tertiary-container: #004b54;
+  --color-on-primary-fixed-variant: #693c00;
+  --color-on-primary-fixed: #2c1600;
 }
 
 /* Custom scrollbars for a clean industrial console feel */
@@ -37,3 +90,74 @@
 .animate-bounce-subtle {
   animation: bounceSubtle 3s ease-in-out infinite;
 }
+
+/* FICSIT Public portal classes */
+:root {
+  --ficsit-orange: #ff9800;
+  --ficsit-slate: #554434;
+}
+
+.public-body {
+  background-color: #111317;
+  background-image: 
+      linear-gradient(rgba(255, 152, 0, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 152, 0, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: #e2e2e7;
+}
+
+.hazard-strip {
+  background: repeating-linear-gradient(
+      45deg,
+      #ffe083,
+      #ffe083 10px,
+      #111317 10px,
+      #111317 20px
+  );
+}
+
+.scanline {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 152, 0, 0.1);
+  position: absolute;
+  animation: scanline 8s linear infinite;
+  z-index: 10;
+  pointer-events: none;
+}
+
+@keyframes scanline {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.led-pulse {
+  animation: led-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
+}
+
+.glitch-hover:hover {
+  text-shadow: 2px 0 #ff9800, -2px 0 #00e0fa;
+}
+
+.terminal-button {
+  box-shadow: 4px 4px 0px #000000;
+  transition: all 0.1s;
+}
+.terminal-button:active {
+  box-shadow: 0px 0px 0px #000000;
+  transform: translate(4px, 4px);
+}
+
+/* Prevent Google One Tap invisible iframe container from blocking clicks in the top right corner */
+#credential_picker_container {
+  display: none !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+

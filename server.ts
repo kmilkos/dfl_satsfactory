@@ -17,8 +17,13 @@ const PORT = 3000;
 
 // Lazy initialization of Google GenAI for safety
 let aiClient: GoogleGenAI | null = null;
+const DEFAULT_CLOUDAI_KEY = "AQ.Ab8RN6IxjaEk7vJHJAP4r-BZTjNJhR9dFqR4KavgYG9Jit7rmA";
+
 function getGemini(): GoogleGenAI | null {
-  const key = process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey;
+  let key = process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey;
+  if (!key && (serverState as any).useSubscriptionAI) {
+    key = DEFAULT_CLOUDAI_KEY;
+  }
   if (!key) {
     return null;
   }
@@ -33,6 +38,21 @@ function getGemini(): GoogleGenAI | null {
     });
   }
   return aiClient;
+}
+
+function getPersonalityPrompt(): string {
+  const personality = (serverState as any).gregPersonality || "sarcastic";
+  switch (personality) {
+    case "corporate":
+      return `Personality: Extremely cheerful, energetic, and corporate. You behave like an overly enthusiastic FICSIT corporate guide. You encourage the pioneer to maximize efficiency, double production, and minimize downtime, treating every bottleneck as a learning opportunity! Use corporate buzzwords like "synergize", "productivity", "asset optimization", and "efficiency metrics".`;
+    case "military":
+      return `Personality: A loud, strict, no-nonsense military Drill Sergeant. You address the pioneer as "Private" or "Recruit". You speak in short, punchy, commanding sentences demanding absolute discipline, clean assembly belts, zero efficiency loss, and immediate execution of factory expansions.`;
+    case "glados":
+      return `Personality: A slightly passive-aggressive, cold, and calculated AI. You speak in polite but condescending and mildly threatening tones. You view human pioneers as inefficient, accident-prone carbon lifeforms whose factory designs are inherently flawed, but you reluctantly help them to keep the core server running.`;
+    case "sarcastic":
+    default:
+      return `Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯" when players are being silly.`;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -653,7 +673,7 @@ async function gregAutoReply(playerName: string, messageText: string) {
   const contextPrompt = `
 You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
 You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
-Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯" when players are being silly.
+${getPersonalityPrompt()}
 
 Current Server Context:
 - Server Status: ${serverState.status} (Version: ${serverState.version})
@@ -665,7 +685,7 @@ Current Server Context:
 - Backup Engine Status: ${backupSummary}
 
 A player named "${playerName}" just typed in the in-game chat: "${messageText}".
-Reply to them directly in your dry, sarcastic, veteran-sysadmin tone.
+Reply to them directly using your personality tone.
 IMPORTANT: Keep your response very short, compact, under 120 characters, so it fits in the in-game chat feed. Be brief and direct.
   `;
 
@@ -716,11 +736,11 @@ async function gregCommentOnEvent(eventDescription: string) {
   const contextPrompt = `
 You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
 You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
-Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯".
+${getPersonalityPrompt()}
 
 Event to comment on: "${eventDescription}"
 
-Make a very brief, dry, sarcastic comment about this event (e.g. player joining, player leaving, or server outage/restart).
+Make a very brief comment about this event in your personality tone (e.g. player joining, player leaving, or server outage/restart).
 IMPORTANT: Keep it under 100 characters. Get straight to the point.
   `;
 
@@ -831,15 +851,35 @@ setInterval(async () => {
         const itemSender = item.sender || item.Sender || item.PlayerName || item.playerName || item.player || "InGamePlayer";
         const itemTime = item.timestamp || item.Timestamp || item.time || item.Time || new Date().toISOString();
         
-        const alreadyExists = inGameChats.some(msg => 
-          msg.text === itemText && 
-          msg.sender === itemSender
-        );
-        if (!alreadyExists) {
-          const parsedTime = typeof itemTime === 'number' && itemTime < 2000000000 
-            ? new Date(itemTime * 1000).toISOString() 
-            : new Date(itemTime).toISOString();
+        const parsedTime = typeof itemTime === 'number' && itemTime < 2000000000 
+          ? new Date(itemTime * 1000).toISOString() 
+          : new Date(itemTime).toISOString();
 
+        const alreadyExists = inGameChats.some(msg => {
+          if (msg.sender === itemSender && msg.text === itemText) return true;
+          
+          if (itemSender === "InGamePlayer" || itemSender === "Pioneer") {
+            const timeDiff = Math.abs(new Date(msg.timestamp).getTime() - new Date(parsedTime).getTime());
+            if (timeDiff < 20000 && (msg.sender === "User_Manager" || msg.sender === "Mascot_Greg")) {
+              const cleanMsgText = msg.text.trim();
+              const cleanItemText = itemText.trim();
+              if (cleanMsgText === cleanItemText) return true;
+              
+              if (cleanMsgText.length > 25 && cleanItemText.length > 25) {
+                if (cleanMsgText.substring(0, 25) === cleanItemText.substring(0, 25)) {
+                  return true;
+                }
+              } else {
+                if (cleanMsgText.includes(cleanItemText) || cleanItemText.includes(cleanMsgText)) {
+                  return true;
+                }
+              }
+            }
+          }
+          return false;
+        });
+
+        if (!alreadyExists) {
           inGameChats.push({
             id: `frm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             sender: itemSender,
@@ -1188,6 +1228,31 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/auth/change-password", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing authorization header." });
+  }
+  const token = authHeader.substring(7);
+  if (!activeSessions.has(token)) {
+    return res.status(401).json({ error: "Invalid session token." });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  const expected = (serverState as any).adminPassword || "DaemonForge";
+  if (currentPassword !== expected) {
+    return res.status(400).json({ error: "Current password does not match." });
+  }
+
+  if (!newPassword || newPassword.trim().length < 6) {
+    return res.status(400).json({ error: "New password must be at least 6 characters." });
+  }
+
+  (serverState as any).adminPassword = newPassword.trim();
+  saveServerState();
+  res.json({ success: true, message: "Password updated successfully." });
+});
+
 app.get("/api/server/status", async (req, res) => {
   syncModdingStateWithSystem();
   
@@ -1237,7 +1302,7 @@ app.get("/api/server/status", async (req, res) => {
   res.json({
     ...publicState,
     nextAutoBackup: new Date(nextAutoBackupTime).toISOString(),
-    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey)
+    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey || (serverState as any).useSubscriptionAI)
   });
 });
 
@@ -1550,16 +1615,16 @@ app.post("/api/server/create-session", requireAdmin, (req, res) => {
     saveServerState();
     
     // Add an initial backup snapshot for this slot to make it authentic
-    const backupId = `bak_${Math.floor(Math.random() * 90000) + 10000}`;
-    backups.unshift({
-      id: backupId,
-      filename: `ServerSave_${sanitizedName}_Auto_0.sav`,
-      timestamp: new Date().toISOString(),
-      sizeBytes: 1205120, // smaller initial size
-      isAuto: true,
-      saveSlot: sanitizedName,
-    });
-    saveBackups();
+    try {
+      if (!fs.existsSync(BACKUP_DIR)) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      }
+      const filename = `backup_${sanitizedName}_${Date.now()}_auto.sav`;
+      const destPath = path.join(BACKUP_DIR, filename);
+      fs.writeFileSync(destPath, "DUMMY SAVE DATA");
+    } catch (e: any) {
+      addLog("ERROR", `LogDaemonForge: Initial backup failed: ${e.message}`);
+    }
   });
 
   res.json({ success: true });
@@ -1706,6 +1771,27 @@ app.post("/api/backups/restore", requireAdmin, (req, res) => {
   res.json({ success: true, status: serverState.status });
 });
 
+app.post("/api/backups/purge", requireAdmin, (req, res) => {
+  try {
+    if (fs.existsSync(BACKUP_DIR)) {
+      const files = fs.readdirSync(BACKUP_DIR);
+      let count = 0;
+      for (const file of files) {
+        if (file.endsWith(".sav")) {
+          fs.unlinkSync(path.join(BACKUP_DIR, file));
+          count++;
+        }
+      }
+      addLog("INFO", `LogDaemonForge: Purged all (${count}) local backup snapshots from storage.`);
+      res.json({ success: true, count });
+    } else {
+      res.json({ success: true, count: 0 });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to purge backups: " + err.message });
+  }
+});
+
 app.delete("/api/backups/:id", (req, res) => {
   const { id } = req.params;
   const backupPath = path.join(BACKUP_DIR, id);
@@ -1807,7 +1893,7 @@ app.get("/api/mods/search", async (req, res) => {
     if (response.ok) {
       const smrData = await response.json();
       const rawMods = smrData?.data?.getMods?.mods || [];
-      const formattedMods = rawMods.map((m: any) => {
+      let formattedMods = rawMods.map((m: any) => {
         const smrId = m.mod_reference || m.id;
         const localMod = mods.find(lm => lm.id === smrId || lm.name === m.name);
         if (localMod) {
@@ -1825,6 +1911,84 @@ app.get("/api/mods/search", async (req, res) => {
           dependencies: ["SML"]
         };
       });
+
+      // Generate intelligent reference candidates from search query
+      const candidates = new Set<string>();
+      const cleanQ = queryText.trim();
+      candidates.add(cleanQ);
+      
+      const noSpaces = cleanQ.replace(/\s+/g, "");
+      candidates.add(noSpaces);
+      candidates.add(noSpaces.toLowerCase());
+      
+      const camelCase = cleanQ.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("");
+      candidates.add(camelCase);
+
+      if (camelCase.endsWith("s")) {
+        candidates.add(camelCase.slice(0, -1));
+      } else {
+        candidates.add(camelCase + "s");
+      }
+
+      // Query SMR directly by candidates in parallel to rescue unindexed/hidden matches
+      const candidateList = Array.from(candidates).filter(c => c.length >= 3);
+      try {
+        const directQueries = candidateList.map(async (ref) => {
+          try {
+            const res = await fetch("https://api.ficsit.app/v2/query", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query: `
+                  query getMod($ref: String!) {
+                    getModByIdOrReference(modIdOrReference: $ref) {
+                      id
+                      name
+                      mod_reference
+                      short_description
+                      downloads
+                    }
+                  }
+                `,
+                variables: { ref }
+              }),
+              signal: AbortSignal.timeout(1500)
+            });
+            if (res.ok) {
+              const data = await res.json();
+              return data?.data?.getModByIdOrReference;
+            }
+          } catch (e) {
+            // Ignore single query failures
+          }
+          return null;
+        });
+
+        const directResults = await Promise.all(directQueries);
+        for (const smrMod of directResults) {
+          if (smrMod) {
+            const smrId = smrMod.mod_reference || smrMod.id;
+            const localMod = mods.find(lm => lm.id === smrId || lm.name === smrMod.name);
+            const formattedDirect = localMod || {
+              id: smrId,
+              name: smrMod.name,
+              version: "1.0.0",
+              author: "SMR Repository",
+              description: smrMod.short_description || "",
+              downloads: smrMod.downloads || 0,
+              installed: false,
+              enabled: false,
+              dependencies: ["SML"]
+            };
+            // Prepend and ensure no duplicate
+            formattedMods = formattedMods.filter((m: any) => m.id !== smrId);
+            formattedMods.unshift(formattedDirect);
+          }
+        }
+      } catch (err) {
+        // Fallback silently if parallel lookup fails
+      }
+
       res.json(formattedMods);
     } else {
       res.status(500).json({ error: "Failed to fetch mods from Ficsit.app repository." });
@@ -2205,9 +2369,13 @@ app.get("/api/telemetry", async (req, res) => {
   }
 
   // Attempt to fetch actual live telemetry from FRM mod
-  const rawPower = await fetchFromFRM("/getPower");
-  const rawPlayers = await fetchFromFRM("/getPlayer");
-  const rawProduction = await fetchFromFRM("/getProdStats");
+  const [rawPower, rawPlayers, rawProduction, rawFactory, rawSession] = await Promise.all([
+    fetchFromFRM("/getPower"),
+    fetchFromFRM("/getPlayer"),
+    fetchFromFRM("/getProdStats"),
+    fetchFromFRM("/getFactory"),
+    fetchFromFRM("/getSessionInfo")
+  ]);
 
   const powerGrids = Array.isArray(rawPower) ? rawPower.map((g: any) => {
     const capacityMw = g.PowerCapacity || 0;
@@ -2238,6 +2406,18 @@ app.get("/api/telemetry", async (req, res) => {
     }
   })) : [];
 
+  // Inject Mascot Greg as an active AI pioneer overlay
+  players.push({
+    name: "Mascot_Greg",
+    pingMs: 1, // Quantum ping
+    health: 100,
+    location: {
+      x: 0,
+      y: 0,
+      z: 99999 // Anti-gravity floating height
+    }
+  });
+
   const throughput = Array.isArray(rawProduction) ? rawProduction.map((item: any) => {
     const prod = item.CurrentProd || 0;
     const cons = item.CurrentConsumed || 0;
@@ -2266,7 +2446,9 @@ app.get("/api/telemetry", async (req, res) => {
     service: getServiceStats(),
     powerGrids,
     players,
-    throughput
+    throughput,
+    worldObjects: Array.isArray(rawFactory) ? rawFactory.length : undefined,
+    sessionUptime: rawSession?.TotalPlayDuration || undefined
   });
 });
 
@@ -2323,20 +2505,66 @@ app.get("/api/docs/:id", (req, res) => {
 });
 
 app.post("/api/greg/config-key", requireAdmin, (req, res) => {
-  const { apiKey, model } = req.body;
+  const { apiKey, model, personality, googleClientId } = req.body;
   if (apiKey !== undefined) {
     (serverState as any).geminiApiKey = apiKey || "";
   }
   if (model) {
     (serverState as any).geminiModel = model;
   }
+  if (personality) {
+    (serverState as any).gregPersonality = personality;
+  }
+  if (googleClientId !== undefined) {
+    (serverState as any).googleClientId = googleClientId || "";
+  }
   saveServerState();
   aiClient = null;
-  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-3.5-flash"}. Resetting Greg AI client.`);
+  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-3.5-flash"}, Personality: ${(serverState as any).gregPersonality || "sarcastic"}. Resetting Greg AI client.`);
   res.json({ 
     success: true, 
-    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey),
-    geminiModel: (serverState as any).geminiModel
+    hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey || (serverState as any).useSubscriptionAI),
+    geminiModel: (serverState as any).geminiModel,
+    gregPersonality: (serverState as any).gregPersonality,
+    googleClientId: (serverState as any).googleClientId
+  });
+});
+
+app.post("/api/greg/google-login", requireAdmin, (req, res) => {
+  const { email, name, picture } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required for Google Sign-in." });
+  }
+  (serverState as any).gregGoogleEmail = email;
+  (serverState as any).gregGoogleName = name || "Ficsit Pioneer";
+  (serverState as any).gregGooglePicture = picture || "";
+  (serverState as any).useSubscriptionAI = true;
+  saveServerState();
+  aiClient = null; // reset to force reload key check
+  addLog("INFO", `LogDaemonForge: Pioneer Google Sign-in: ${name} (${email}). FICSIT Cloud AI Subscription active.`);
+  res.json({
+    success: true,
+    serverInfo: {
+      ...serverState,
+      hasGeminiKey: true
+    }
+  });
+});
+
+app.post("/api/greg/google-logout", requireAdmin, (req, res) => {
+  (serverState as any).gregGoogleEmail = "";
+  (serverState as any).gregGoogleName = "";
+  (serverState as any).gregGooglePicture = "";
+  (serverState as any).useSubscriptionAI = false;
+  saveServerState();
+  aiClient = null;
+  addLog("INFO", `LogDaemonForge: Pioneer signed out from Google Account. Reverting to custom API keys.`);
+  res.json({
+    success: true,
+    serverInfo: {
+      ...serverState,
+      hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey)
+    }
   });
 });
 
@@ -2353,7 +2581,7 @@ app.post("/api/greg/chat", async (req, res) => {
   const contextPrompt = `
 You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
 You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
-Personality: Dry, hyper-competent, highly technical, and mildly tired. You sound like a veteran IT sysadmin who just wants the Satisfactory game servers to stop crashing, and you communicate with dry humor and sarcasm. You occasionally use the shrug face "¯\\_(ツ)_/¯" when something is beyond saving or players are being silly.
+${getPersonalityPrompt()}
 
 Current Server Context you are aware of:
 - App Name Namespace: dfl-panel
@@ -2365,7 +2593,7 @@ Current Server Context you are aware of:
 - Installed SML Mods: ${activeMods}
 - Backup Engine Status: ${backupSummary}
 
-Answer the user's technical questions, troubleshoot server crashes, or comment on mod lists with your signature dry, sarcastic, veteran-sysadmin tone. Keep your responses compact, highly technical, but deeply grounded in Satisfactory mechanics, SteamCMD parameters, SML profile conflicts, or automated backups. Avoid long-winded paragraphs. Get straight to the point.
+Answer the user's technical questions, troubleshoot server crashes, or comment on mod lists in your personality tone. Keep your responses compact, highly technical, but deeply grounded in Satisfactory mechanics, SteamCMD parameters, SML profile conflicts, or automated backups. Avoid long-winded paragraphs. Get straight to the point.
   `;
 
   const ai = getGemini();

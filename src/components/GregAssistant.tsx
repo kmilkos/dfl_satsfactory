@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Terminal, Send, Info, AlertOctagon, HelpCircle, Key, CheckCircle2 } from "lucide-react";
+import { Terminal, Send, Info, AlertOctagon, HelpCircle, CheckCircle2 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,6 +10,7 @@ interface GregAssistantProps {
   serverStatus: string;
   hasGeminiKey: boolean;
   geminiModel: string;
+  gregPersonality?: string;
   onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
 }
@@ -18,6 +19,7 @@ export default function GregAssistant({
   serverStatus, 
   hasGeminiKey, 
   geminiModel,
+  gregPersonality = "sarcastic",
   onRefreshStatus, 
   isLoading: serverLoading 
 }: GregAssistantProps) {
@@ -29,59 +31,7 @@ export default function GregAssistant({
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [isSavingKey, setIsSavingKey] = useState(false);
-  const [keySaveMessage, setKeySaveMessage] = useState("");
   const assistantEndRef = useRef<HTMLDivElement>(null);
-
-  const handleSaveApiKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiKeyInput.trim() && !hasGeminiKey) return;
-    setIsSavingKey(true);
-    setKeySaveMessage("");
-    try {
-      const res = await fetch("/api/greg/config-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKeyInput })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setKeySaveMessage("API Key updated successfully!");
-        setApiKeyInput("");
-        if (onRefreshStatus) await onRefreshStatus();
-      } else {
-        setKeySaveMessage("Failed to save API key.");
-      }
-    } catch (err: any) {
-      setKeySaveMessage("Error: " + err.message);
-    } finally {
-      setIsSavingKey(false);
-    }
-  };
-
-  const handleModelChange = async (newModel: string) => {
-    setIsSavingKey(true);
-    setKeySaveMessage("");
-    try {
-      const res = await fetch("/api/greg/config-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: newModel })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setKeySaveMessage(`Model updated to ${newModel}`);
-        if (onRefreshStatus) await onRefreshStatus();
-      } else {
-        setKeySaveMessage("Failed to update model configuration.");
-      }
-    } catch (err: any) {
-      setKeySaveMessage("Error updating model: " + err.message);
-    } finally {
-      setIsSavingKey(false);
-    }
-  };
 
   // Quick suggestions
   const suggestions = [
@@ -145,11 +95,21 @@ export default function GregAssistant({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 shrink-0">
         <div className="text-left">
           <h1 className="text-xl font-mono text-orange-500 uppercase tracking-wider font-bold">Mascot Core: Greg</h1>
-          <p className="text-xs text-slate-400 font-mono mt-0.5">Sarcastic, veteran IT sysadmin AI running background daemons</p>
+          <p className="text-xs text-slate-400 font-mono mt-0.5">
+            {gregPersonality === "corporate" && "Overly positive FICSIT guide pushing for maximum productivity"}
+            {gregPersonality === "military" && "Commanding officer enforcing absolute factory cleanliness"}
+            {gregPersonality === "glados" && "Condescending mainframe running security protocols on humans"}
+            {gregPersonality === "sarcastic" && "Sarcastic, veteran IT sysadmin AI running background daemons"}
+          </p>
         </div>
         <div className="text-xs font-mono text-slate-400 mt-2 md:mt-0 flex items-center bg-zinc-900 border border-slate-800 px-3 py-1.5 rounded">
           <span className="w-2 h-2 rounded-full bg-orange-500 mr-2 animate-pulse"></span>
-          Personality: <span className="text-orange-500 ml-1 font-bold">SARCASMTIC (TIRED SYSADMIN)</span>
+          Personality: <span className="text-orange-500 ml-1 font-bold uppercase">
+            {gregPersonality === "corporate" && "Corporate (Cheery Guide)"}
+            {gregPersonality === "military" && "Military (Drill Sergeant)"}
+            {gregPersonality === "glados" && "Paranoid AI (GLaDOS style)"}
+            {gregPersonality === "sarcastic" && "Sarcastic (Tired Sysadmin)"}
+          </span>
         </div>
       </div>
 
@@ -188,76 +148,6 @@ export default function GregAssistant({
               <li>• Patience: <span className="text-rose-400 font-bold">Extremely Low</span></li>
               <li>• Visor Status: <span className="text-slate-200">¯\_(ツ)_/¯ enabled</span></li>
             </ul>
-          </div>
-
-          {/* Gemini API Key Configuration Card */}
-          <div className="bg-zinc-900 border border-slate-800 rounded-lg p-4 space-y-3 shadow-lg">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center">
-              <Key className="w-4 h-4 mr-1.5 text-orange-500" /> API Configuration
-            </span>
-            
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-mono text-slate-500 uppercase">Mascot AI status:</span>
-              <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold ${
-                hasGeminiKey 
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : "bg-orange-500/10 text-orange-400 border border-orange-500/20 animate-pulse"
-              }`}>
-                {hasGeminiKey ? "ACTIVE" : "OFFLINE STUBS"}
-              </span>
-            </div>
-
-            <p className="text-[10px] font-mono text-slate-500 leading-normal">
-              {hasGeminiKey 
-                ? "Mascot engine fully initialized via Google Gemini API." 
-                : "Mascot is operating in offline sandbox mode. Enter a Gemini API Key to enable cognitive reasoning."}
-            </p>
-
-            <div className="space-y-1 text-left pt-1 border-t border-slate-800/60">
-              <label className="text-[9px] font-mono text-slate-500 uppercase font-bold">Engine Model</label>
-              <select
-                value={geminiModel}
-                onChange={(e) => handleModelChange(e.target.value)}
-                disabled={isSavingKey}
-                className="w-full px-2.5 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-[10px] text-slate-300 focus:outline-none focus:border-orange-500 cursor-pointer"
-              >
-                <option value="gemini-3.5-flash">Gemini 3.5 Flash (Flagship Fast)</option>
-                <option value="gemini-3.5-pro">Gemini 3.5 Pro (Flagship High-Intelligence)</option>
-                <option value="gemini-3.1-flash">Gemini 3.1 Flash (Legacy Fast)</option>
-                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Analytical Preview)</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro Experimental</option>
-                <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking Experimental</option>
-              </select>
-            </div>
-
-            <form onSubmit={handleSaveApiKey} className="space-y-2 pt-1.5">
-              <input
-                type="password"
-                placeholder={hasGeminiKey ? "••••••••••••••••" : "Enter GEMINI_API_KEY..."}
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                disabled={isSavingKey}
-                className="w-full px-2.5 py-1.5 bg-zinc-955 border border-slate-800 rounded font-mono text-[10px] text-slate-100 placeholder-slate-700 focus:outline-none focus:border-orange-500"
-              />
-              <button
-                type="submit"
-                disabled={isSavingKey || (!apiKeyInput.trim() && !hasGeminiKey)}
-                className={`w-full py-1.5 rounded font-mono font-bold text-[10px] transition-colors cursor-pointer ${
-                  !apiKeyInput.trim() && !hasGeminiKey
-                    ? "bg-slate-850 text-slate-500 border border-slate-800"
-                    : "bg-orange-500 text-zinc-950 hover:bg-orange-600"
-                }`}
-              >
-                {isSavingKey ? "SAVING..." : hasGeminiKey && !apiKeyInput.trim() ? "CLEAR KEY" : "SAVE KEY"}
-              </button>
-            </form>
-            
-            {keySaveMessage && (
-              <p className="text-[9px] font-mono text-center text-slate-400 animate-pulse">
-                {keySaveMessage}
-              </p>
-            )}
           </div>
         </div>
 

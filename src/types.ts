@@ -11,6 +11,12 @@ export interface ServerState {
   hasGeminiKey?: boolean;
   geminiModel?: string;
   autoHealEnabled?: boolean;
+  gregPersonality?: string;
+  gregGoogleEmail?: string;
+  gregGoogleName?: string;
+  gregGooglePicture?: string;
+  useSubscriptionAI?: boolean;
+  googleClientId?: string;
 }
 
 export interface Backup {
@@ -73,6 +79,8 @@ export interface TelemetryData {
   powerGrids: PowerGridStats[];
   players: PlayerInfo[];
   throughput: ItemThroughput[];
+  worldObjects?: number;
+  sessionUptime?: number;
 }
 
 export interface TelemetryHistoryPoint {

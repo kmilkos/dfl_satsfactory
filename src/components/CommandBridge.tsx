@@ -24,6 +24,17 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus, o
       {/* Left Menu: Server Operations */}
       <nav className="flex flex-1 items-center space-x-6 text-sm font-sans font-semibold text-slate-300">
         <button
+          onClick={() => setActiveTab("chat")}
+          className={`pb-1 border-b-2 transition-all cursor-pointer ${
+            activeTab === "chat"
+              ? "text-orange-500 border-orange-500"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+          id="tab-btn-chat"
+        >
+          Live Chat
+        </button>
+        <button
           onClick={() => setActiveTab("nodes")}
           className={`pb-1 border-b-2 transition-all cursor-pointer ${
             activeTab === "nodes"
@@ -32,7 +43,7 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus, o
           }`}
           id="tab-btn-nodes"
         >
-          Satisfactory Node
+          Server Control
         </button>
         <button
           onClick={() => setActiveTab("backups")}
@@ -54,18 +65,19 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus, o
           }`}
           id="tab-btn-mods"
         >
-          SML Mods (ficsit-cli)
+          Mod Manager
         </button>
+
         <button
-          onClick={() => setActiveTab("quick-actions")}
+          onClick={() => setActiveTab("telemetry")}
           className={`pb-1 border-b-2 transition-all cursor-pointer ${
-            activeTab === "quick-actions"
+            activeTab === "telemetry"
               ? "text-orange-500 border-orange-500"
               : "border-transparent text-slate-400 hover:text-slate-200"
           }`}
-          id="tab-btn-quick-actions"
+          id="tab-btn-telemetry"
         >
-          Quick Actions
+          Factory Stats
         </button>
       </nav>
 
@@ -103,15 +115,15 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus, o
       {/* Right Menu: Diagnostics, Chat, & Docs */}
       <nav className="flex flex-1 justify-end items-center space-x-6 text-sm font-sans font-semibold text-slate-300">
         <button
-          onClick={() => setActiveTab("telemetry")}
+          onClick={() => setActiveTab("flow-diagram")}
           className={`pb-1 border-b-2 transition-all cursor-pointer ${
-            activeTab === "telemetry"
+            activeTab === "flow-diagram"
               ? "text-orange-500 border-orange-500"
               : "border-transparent text-slate-400 hover:text-slate-200"
           }`}
-          id="tab-btn-telemetry"
+          id="tab-btn-flow-diagram"
         >
-          Factory Stats
+          Machine Flows
         </button>
         <button
           onClick={() => setActiveTab("logs")}
@@ -135,16 +147,17 @@ export default function CommandBridge({ activeTab, setActiveTab, serverStatus, o
         >
           Greg Chat
         </button>
+
         <button
-          onClick={() => setActiveTab("docs")}
+          onClick={() => setActiveTab("settings")}
           className={`pb-1 border-b-2 transition-all cursor-pointer ${
-            activeTab === "docs"
+            activeTab === "settings"
               ? "text-orange-500 border-orange-500"
               : "border-transparent text-slate-400 hover:text-slate-200"
           }`}
-          id="tab-btn-docs"
+          id="tab-btn-settings"
         >
-          Docs Hub
+          Settings
         </button>
 
         {/* Status indicator pill */}
