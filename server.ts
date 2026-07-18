@@ -630,22 +630,30 @@ async function sendChatToGame(message: string): Promise<void> {
       await syncFRMToken();
     }
     const headers: Record<string, string> = {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json; charset=utf-8"
     };
     if (frmAuthToken) {
       headers["X-FRM-Authorization"] = frmAuthToken;
     }
+    
+    // Safely encode any Unicode/Greek characters as standard JSON \uXXXX escape sequences.
+    // This protects non-ASCII characters from raw byte decoding (ANSI/Latin-1) issues in the FRM mod server.
+    const rawBody = JSON.stringify({ message });
+    const safeBody = rawBody.replace(/[^\x00-\x7F]/g, (char) => {
+      return "\\u" + ("0000" + char.charCodeAt(0).toString(16)).slice(-4);
+    });
+
     let response = await fetch(`${FRM_BASE}/sendChatMessage`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ message }),
+      body: safeBody,
       signal: AbortSignal.timeout(800)
     });
     if (response.status === 401 || response.status === 403) {
       frmAuthToken = "";
       await syncFRMToken();
       const retryHeaders: Record<string, string> = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
       };
       if (frmAuthToken) {
         retryHeaders["X-FRM-Authorization"] = frmAuthToken;
@@ -653,7 +661,7 @@ async function sendChatToGame(message: string): Promise<void> {
       response = await fetch(`${FRM_BASE}/sendChatMessage`, {
         method: "POST",
         headers: retryHeaders,
-        body: JSON.stringify({ message }),
+        body: safeBody,
         signal: AbortSignal.timeout(800)
       });
     }
