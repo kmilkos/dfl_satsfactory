@@ -793,6 +793,30 @@ IMPORTANT: Keep it under 100 characters. Get straight to the point.
   }
 }
 
+function decodeGarbledFString(str: string): string {
+  if (!str) return "";
+  let hasGarbled = false;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code >= 0xFF00 && code <= 0xFFFF) {
+      hasGarbled = true;
+      break;
+    }
+  }
+  if (!hasGarbled) return str;
+
+  const bytes: number[] = [];
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code >= 0xFF00 && code <= 0xFFFF) {
+      bytes.push(code & 0xFF);
+    } else {
+      bytes.push(code & 0xFF);
+    }
+  }
+  return Buffer.from(bytes).toString("utf-8");
+}
+
 // --- REAL-TIME LIVE CHAT & ONLINE PLAYERS ATTACHED POLLER ---
 let lastOnlinePlayers: string[] = [];
 
@@ -807,7 +831,7 @@ setInterval(async () => {
     if (!Array.isArray(rawPlayers)) {
       rawPlayers = [];
     }
-    const currentPlayers = rawPlayers.map((p: any) => p.PlayerName || "");
+    const currentPlayers = rawPlayers.map((p: any) => decodeGarbledFString(p.PlayerName || ""));
 
     let chatChanged = false;
 
@@ -855,8 +879,12 @@ setInterval(async () => {
     const rawChat = await fetchFromFRM("/getChatMessages");
     if (Array.isArray(rawChat)) {
       for (const item of rawChat) {
-        const itemText = item.text || item.Text || item.Message || item.message || item.msg;
-        const itemSender = item.sender || item.Sender || item.PlayerName || item.playerName || item.player || "InGamePlayer";
+        const rawText = item.text || item.Text || item.Message || item.message || item.msg || "";
+        const itemText = decodeGarbledFString(rawText);
+        
+        const rawSender = item.sender || item.Sender || item.PlayerName || item.playerName || item.player || "InGamePlayer";
+        const itemSender = decodeGarbledFString(rawSender);
+        
         const itemTime = item.timestamp || item.Timestamp || item.time || item.Time || new Date().toISOString();
         
         const parsedTime = typeof itemTime === 'number' && itemTime < 2000000000 
@@ -2404,7 +2432,7 @@ app.get("/api/telemetry", async (req, res) => {
   }) : [];
 
   const players = Array.isArray(rawPlayers) ? rawPlayers.map((p: any) => ({
-    name: p.PlayerName || "",
+    name: decodeGarbledFString(p.PlayerName || ""),
     pingMs: p.PlayerPing || 0,
     health: p.PlayerHealth || 0,
     location: {
