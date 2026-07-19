@@ -37,7 +37,7 @@ export default function InGameChatPanel({
   };
 
   return (
-    <div className="flex-1 overflow-hidden p-6 flex flex-col h-full text-slate-200">
+    <div className="flex-1 overflow-y-auto md:overflow-hidden p-4 md:p-6 flex flex-col h-full text-slate-200">
       
       {/* Header & Tagline */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 shrink-0">
@@ -52,10 +52,10 @@ export default function InGameChatPanel({
       </div>
 
       {/* IRC Client Body */}
-      <div className="flex-1 flex gap-6 min-h-0 mt-6 overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 mt-6 overflow-visible md:overflow-hidden">
         
         {/* Left Column: Chat log stream and message input */}
-        <div className="flex-1 flex flex-col min-w-0 h-full bg-zinc-900 border border-slate-800 rounded-lg p-5 shadow-lg">
+        <div className="flex-1 flex flex-col min-w-0 min-h-[400px] md:min-h-0 bg-zinc-900 border border-slate-800 rounded-lg p-4 md:p-5 shadow-lg">
           {/* Section Header */}
           <div className="border-b border-slate-800 pb-3 mb-4 flex justify-between items-center text-left shrink-0">
             <span className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center">
@@ -135,7 +135,7 @@ export default function InGameChatPanel({
         </div>
 
         {/* Right Column: IRC Player/User List (Dual line details per Pioneer) */}
-        <div className="w-60 bg-zinc-900 border border-slate-800 rounded-lg p-5 flex flex-col h-full overflow-hidden shrink-0 shadow-lg text-left">
+        <div className="w-full md:w-60 bg-zinc-900 border border-slate-800 rounded-lg p-4 md:p-5 flex flex-col h-auto md:h-full overflow-hidden shrink-0 shadow-lg text-left">
           <div className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider pb-3 border-b border-slate-800 flex items-center justify-between mb-4 shrink-0">
             <span className="flex items-center">
               <Users className="w-4 h-4 mr-2 text-orange-500 animate-pulse" /> Active Pioneers

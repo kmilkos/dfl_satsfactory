@@ -497,7 +497,7 @@ export default function App() {
       />
 
       {/* Main viewport Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-hidden flex flex-col justify-center">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 overflow-y-auto md:overflow-hidden flex flex-col justify-center">
         
         {/* Animated layout stage wrapper */}
         <AnimatePresence mode="wait">
