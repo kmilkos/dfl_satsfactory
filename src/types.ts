@@ -73,6 +73,19 @@ export interface ServiceStats {
   subState: string;
 }
 
+export interface SpaceElevatorPhase {
+  name: string;
+  amount: number;
+  totalCost: number;
+  remainingCost: number;
+}
+
+export interface SpaceElevatorData {
+  fullyUpgraded: boolean;
+  upgradeReady: boolean;
+  currentPhase: SpaceElevatorPhase[];
+}
+
 export interface TelemetryData {
   cpuUsage: number; // percentage
   ramUsageGb: number; // in GB
@@ -83,7 +96,9 @@ export interface TelemetryData {
   throughput: ItemThroughput[];
   worldObjects?: number;
   sessionUptime?: number;
+  spaceElevator?: SpaceElevatorData;
 }
+
 
 export interface TelemetryHistoryPoint {
   time: string;

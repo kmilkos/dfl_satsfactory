@@ -2439,12 +2439,13 @@ app.get("/api/telemetry", async (req, res) => {
   }
 
   // Attempt to fetch actual live telemetry from FRM mod
-  const [rawPower, rawPlayers, rawProduction, rawFactory, rawSession] = await Promise.all([
+  const [rawPower, rawPlayers, rawProduction, rawFactory, rawSession, rawElevator] = await Promise.all([
     fetchFromFRM("/getPower"),
     fetchFromFRM("/getPlayer"),
     fetchFromFRM("/getProdStats"),
     fetchFromFRM("/getFactory"),
-    fetchFromFRM("/getSessionInfo")
+    fetchFromFRM("/getSessionInfo"),
+    fetchFromFRM("/getSpaceElevator")
   ]);
 
   const powerGrids = Array.isArray(rawPower) ? rawPower.map((g: any) => {
@@ -2509,6 +2510,22 @@ app.get("/api/telemetry", async (req, res) => {
   const load = os.loadavg()[0];
   const cpuUsage = Math.min(100, Math.max(0, (load / (cpus.length || 1)) * 100));
 
+  // Map Space Elevator data
+  let spaceElevator = undefined;
+  if (Array.isArray(rawElevator) && rawElevator.length > 0) {
+    const elev = rawElevator[0];
+    spaceElevator = {
+      fullyUpgraded: elev.FullyUpgraded || false,
+      upgradeReady: elev.UpgradeReady || false,
+      currentPhase: Array.isArray(elev.CurrentPhase) ? elev.CurrentPhase.map((p: any) => ({
+        name: p.Name || "",
+        amount: p.Amount || 0,
+        totalCost: p.TotalCost || 0,
+        remainingCost: p.RemainingCost || 0
+      })) : []
+    };
+  }
+
   res.json({
     cpuUsage: isNaN(cpuUsage) ? 12.5 : parseFloat(cpuUsage.toFixed(1)),
     ramUsageGb: parseFloat(ramUsageGb.toFixed(2)),
@@ -2518,7 +2535,8 @@ app.get("/api/telemetry", async (req, res) => {
     players,
     throughput,
     worldObjects: Array.isArray(rawFactory) ? rawFactory.length : undefined,
-    sessionUptime: rawSession?.TotalPlayDuration || undefined
+    sessionUptime: rawSession?.TotalPlayDuration || undefined,
+    spaceElevator
   });
 });
 

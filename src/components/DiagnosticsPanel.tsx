@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Activity, Cpu, MessageSquare, Send, Terminal, 
   Heart, Plug, Compass, Server, Search, RefreshCw, AlertCircle, PlayCircle,
-  Layers, Box, TrendingUp, Gauge, Users, Sliders
+  Layers, Box, TrendingUp, Gauge, Users, Sliders, Rocket
 } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ConsoleLogLine, TelemetryData, ChatMessage, TelemetryHistoryPoint, ItemThroughput } from "../types";
@@ -305,6 +305,102 @@ export default function DiagnosticsPanel({
               )}
             </div>
           </div>
+          {/* SPACE ELEVATOR UPLINK STATUS */}
+          {telemetry.spaceElevator && (
+            <div className="bg-zinc-900 border border-slate-800 rounded-lg p-5 space-y-4 shadow-lg text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex flex-col">
+                  <span className="text-sm font-mono font-bold text-slate-300 uppercase flex items-center">
+                    <Rocket className="w-4 h-4 mr-1.5 text-orange-500" /> Space Elevator Phase Tracker
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500 mt-0.5">Live delivery progress for current FICSIT Tier milestone — items shipped to HQ</span>
+                </div>
+                <div className="flex items-center gap-2 mt-2 sm:mt-0">
+                  {telemetry.spaceElevator.upgradeReady && (
+                    <span className="px-2 py-1 rounded text-[9px] font-mono font-bold border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse">
+                      ✓ UPGRADE READY
+                    </span>
+                  )}
+                  {telemetry.spaceElevator.fullyUpgraded && (
+                    <span className="px-2 py-1 rounded text-[9px] font-mono font-bold border bg-orange-500/10 text-orange-400 border-orange-500/30">
+                      ★ FULLY UPGRADED
+                    </span>
+                  )}
+                  <span className="text-[10px] font-mono text-slate-500 bg-zinc-950 border border-slate-800 px-2 py-1 rounded self-start sm:self-center">Source: GET /getSpaceElevator</span>
+                </div>
+              </div>
+
+              {telemetry.spaceElevator.currentPhase.length === 0 ? (
+                <div className="text-center py-8 text-slate-600 font-mono text-xs">
+                  No active phase items detected. Space Elevator may not be placed yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {telemetry.spaceElevator.currentPhase.map((phase, idx) => {
+                    const delivered = phase.totalCost - phase.remainingCost;
+                    const pct = phase.totalCost > 0 ? Math.min(100, (delivered / phase.totalCost) * 100) : 0;
+                    const done = phase.remainingCost === 0;
+                    return (
+                      <div
+                        key={idx}
+                        className={`bg-zinc-950/60 border rounded-lg p-4 space-y-3 relative overflow-hidden transition-all duration-300 ${
+                          done
+                            ? "border-emerald-500/40 shadow-[0_0_12px_rgba(52,211,153,0.06)]"
+                            : "border-slate-800 hover:border-orange-500/30"
+                        }`}
+                      >
+                        {/* Item name + badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[11px] font-mono font-bold text-slate-200 uppercase leading-tight">{phase.name}</span>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold border ${
+                            done
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          }`}>
+                            {done ? "COMPLETE" : "IN PROGRESS"}
+                          </span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                            <span>DELIVERED</span>
+                            <span className={done ? "text-emerald-400 font-bold" : "text-orange-400 font-bold"}>{pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${
+                                done ? "bg-emerald-500" : "bg-orange-500"
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Counts */}
+                        <div className="flex justify-between text-[10px] font-mono">
+                          <div className="flex flex-col">
+                            <span className="text-slate-500">SHIPPED</span>
+                            <span className="text-slate-100 font-bold">{delivered.toLocaleString()}</span>
+                          </div>
+                          <div className="flex flex-col text-right">
+                            <span className="text-slate-500">REMAINING</span>
+                            <span className={`font-bold ${ done ? "text-emerald-400" : "text-rose-400" }`}>
+                              {phase.remainingCost.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex flex-col text-right">
+                            <span className="text-slate-500">TOTAL</span>
+                            <span className="text-slate-100 font-bold">{phase.totalCost.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
 
 
