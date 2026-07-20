@@ -677,6 +677,20 @@ async function gregAutoReply(playerName: string, messageText: string) {
   const ai = getGemini();
   const activeMods = mods.filter(m => m.installed).map(m => `${m.name} v${m.version}`).join(", ");
   const backupSummary = `${getBackupFilesCount()} snapshots stored, auto-backup is ${serverState.autoBackupEnabled ? 'ENABLED' : 'DISABLED'}`;
+
+  // Fetch actual live power grid telemetry if available
+  let powerSummary = "No active grid telemetry";
+  try {
+    const rawPower = await fetchFromFRM("/getPower");
+    if (Array.isArray(rawPower) && rawPower.length > 0) {
+      const totalProduced = rawPower.reduce((acc, g) => acc + (g.PowerProduction || 0), 0);
+      const totalCapacity = rawPower.reduce((acc, g) => acc + (g.PowerCapacity || 0), 0);
+      const totalConsumed = rawPower.reduce((acc, g) => acc + (g.PowerConsumed || 0), 0);
+      powerSummary = `Total Capacity: ${Math.round(totalCapacity)} MW, Production: ${Math.round(totalProduced)} MW, Consumption: ${Math.round(totalConsumed)} MW`;
+    }
+  } catch (err) {
+    // Keep default
+  }
   
   const contextPrompt = `
 You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
@@ -691,10 +705,14 @@ Current Server Context:
 - Active SML Modding: ${serverState.moddingEnabled ? 'ENABLED' : 'DISABLED'}
 - Installed SML Mods: ${activeMods}
 - Backup Engine Status: ${backupSummary}
+- Power Grid: ${powerSummary}
 
 A player named "${playerName}" just typed in the in-game chat: "${messageText}".
-Reply to them directly using your personality tone.
-IMPORTANT: Keep your response very short, compact, under 120 characters, so it fits in the in-game chat feed. Be brief and direct.
+
+RESPONSE RULES:
+1. Focus your reply directly on what the player "${playerName}" said: "${messageText}".
+2. Do NOT mention or nag players about power grids, capacity, fuses, or power levels unless the player explicitly asked about it, or the current grid consumption exceeds production capacity.
+3. Keep your response very short, compact, under 120 characters, so it fits in the in-game chat feed. Be brief and direct.
   `;
 
   let responseText = "";
