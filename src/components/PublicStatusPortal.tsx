@@ -123,7 +123,7 @@ export default function PublicStatusPortal({
           </div>
 
           {/* Header Telemetry Stats (Middle) */}
-          <div className="flex items-center justify-around w-full md:w-auto gap-4 md:gap-6 font-mono text-[9px] md:text-[10px] border-t border-b border-outline-variant/30 py-1.5 md:py-0 md:border-none">
+          <div className="flex items-center justify-around w-full md:w-auto gap-4 md:gap-6 font-mono text-[9px] md:text-[10px] border-t border-b border-outline-variant/30 py-1.5 md:py-0 md:border-none flex-wrap">
             {/* Factory Machines */}
             <div className="flex items-center gap-1.5 md:border-r md:border-outline-variant/60 md:pr-6">
               <span className="material-symbols-outlined text-primary text-xs md:text-sm">settings</span>
@@ -143,7 +143,7 @@ export default function PublicStatusPortal({
             </div>
 
             {/* Relay Uptime */}
-            <div className="flex items-center gap-1.5">
+            <div className={`flex items-center gap-1.5 ${telemetry.spaceElevator?.currentPhase?.length ? "md:border-r md:border-outline-variant/60 md:pr-6" : ""}`}>
               <span className={`material-symbols-outlined ${statusColor} text-xs md:text-sm`}>
                 {serverStatus === "ONLINE" ? "verified" : "warning"}
               </span>
@@ -152,6 +152,28 @@ export default function PublicStatusPortal({
                 <span className={`${statusColor} font-bold leading-tight`}>{uptimeDisplay}</span>
               </div>
             </div>
+
+            {/* Space Elevator Phase Items */}
+            {telemetry.spaceElevator?.currentPhase?.map((phase, idx) => {
+              const delivered = phase.totalCost - phase.remainingCost;
+              const done = phase.remainingCost === 0;
+              const isLast = idx === (telemetry.spaceElevator!.currentPhase.length - 1);
+              return (
+                <div key={idx} className={`flex items-center gap-1.5 ${!isLast ? "md:border-r md:border-outline-variant/60 md:pr-6" : ""}`}>
+                  <span className={`material-symbols-outlined text-xs md:text-sm ${done ? "text-emerald-400" : "text-amber-400"}`}>
+                    rocket_launch
+                  </span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[6px] md:text-[7px] text-on-surface-variant uppercase font-bold tracking-wider leading-none truncate max-w-[70px] md:max-w-none">
+                      {phase.name}
+                    </span>
+                    <span className={`font-bold leading-tight ${done ? "text-emerald-400" : "text-amber-400"}`}>
+                      {delivered.toLocaleString()}/{phase.totalCost.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="hidden md:flex items-center gap-6">
