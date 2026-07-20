@@ -517,6 +517,7 @@ export default function App() {
                 onSendChatMessage={handleSendChatMessage}
                 telemetry={telemetry}
                 isLoading={isLoading}
+                gregName={serverInfo.gregName || "Mascot_Greg"}
               />
             )}
 
@@ -566,6 +567,7 @@ export default function App() {
                 geminiModel={serverInfo.geminiModel || "gemini-3.5-flash"}
                 onRefreshStatus={fetchStatus}
                 isLoading={isLoading}
+                gregName={serverInfo.gregName || "Mascot_Greg"}
               />
             )}
 

@@ -7,13 +7,15 @@ interface InGameChatPanelProps {
   onSendChatMessage: (text: string) => Promise<void>;
   telemetry: TelemetryData;
   isLoading?: boolean;
+  gregName?: string;
 }
 
 export default function InGameChatPanel({
   inGameChats,
   onSendChatMessage,
   telemetry,
-  isLoading = false
+  isLoading = false,
+  gregName = "Mascot_Greg"
 }: InGameChatPanelProps) {
   const [chatInput, setChatInput] = useState("");
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -74,7 +76,7 @@ export default function InGameChatPanel({
               </div>
             ) : (
               inGameChats.map((msg) => {
-                const isGreg = msg.sender === "Mascot_Greg";
+                const isGreg = msg.sender === gregName || msg.sender === "Mascot_Greg";
                 const isServer = msg.sender === "SERVER";
                 const isUser = msg.sender === "User_Manager";
                 
@@ -152,7 +154,7 @@ export default function InGameChatPanel({
               </div>
             ) : (
               telemetry.players.map((player) => {
-                const isGreg = player.name === "Mascot_Greg";
+                const isGreg = player.name === gregName || player.name === "Mascot_Greg";
                 return (
                   <div 
                     key={player.name} 
@@ -170,7 +172,7 @@ export default function InGameChatPanel({
                         }`}
                         title={player.name}
                       >
-                        {isGreg ? "Mascot_Greg (AI)" : `@${player.name}`}
+                        {isGreg ? `${gregName} (AI)` : `@${player.name}`}
                       </span>
                       <span className={`w-2 h-2 rounded-full shrink-0 ${
                         isGreg 

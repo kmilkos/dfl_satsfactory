@@ -118,6 +118,15 @@ if (serverState.geminiModel === "gemini-2.5-flash" || serverState.geminiModel ==
   saveServerState();
 }
 
+if (!(serverState as any).gregName) {
+  (serverState as any).gregName = "Mascot_Greg";
+  saveServerState();
+}
+if (!(serverState as any).gregPrompt) {
+  (serverState as any).gregPrompt = "You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).\nYou are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.";
+  saveServerState();
+}
+
 const SAVE_DIR = "/home/satisfactory/.config/Epic/FactoryGame/Saved/SaveGames/server";
 const BACKUP_DIR = path.join(SAVE_DIR, "backups");
 
@@ -692,9 +701,12 @@ async function gregAutoReply(playerName: string, messageText: string) {
     // Keep default
   }
   
+  const gregName = (serverState as any).gregName || "Mascot_Greg";
+  const gregPrompt = (serverState as any).gregPrompt || "";
+
   const contextPrompt = `
-You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
-You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
+${gregPrompt}
+
 ${getPersonalityPrompt()}
 
 Current Server Context:
@@ -718,7 +730,7 @@ RESPONSE RULES:
   let responseText = "";
   if (!ai) {
     const offlineReplies = [
-      `Grid alert: ${playerName}'s message ignored because Mascot Greg is in offline mode. ¯\\_(ツ)_/¯`,
+      `Grid alert: ${playerName}'s message ignored because Mascot ${gregName} is in offline mode. ¯\\_(ツ)_/¯`,
       `I would reply to "${messageText}", but Settings secrets are empty. Fix the API key.`,
       `¯\\_(ツ)_/¯ Offline sandbox active. Stop building conveyor belts, the CPU is already crying.`
     ];
@@ -745,7 +757,7 @@ RESPONSE RULES:
     
     inGameChats.push({
       id: `greg_reply_${Date.now()}`,
-      sender: "Mascot_Greg",
+      sender: gregName,
       text: responseText,
       timestamp: new Date().toISOString()
     });
@@ -758,10 +770,12 @@ RESPONSE RULES:
 
 async function gregCommentOnEvent(eventDescription: string) {
   const ai = getGemini();
+  const gregName = (serverState as any).gregName || "Mascot_Greg";
+  const gregPrompt = (serverState as any).gregPrompt || "";
   
   const contextPrompt = `
-You are Greg, the automated backbone mascot of DaemonForge Labs (DFL).
-You are a highly advanced matte-black anti-gravity octahedron projecting hard-light holograms in Warning-label Orange.
+${gregPrompt}
+
 ${getPersonalityPrompt()}
 
 Event to comment on: "${eventDescription}"
@@ -777,7 +791,7 @@ IMPORTANT: Keep it under 100 characters. Get straight to the point.
     } else if (eventDescription.includes("left")) {
       responseText = `Player left. Grid stabilizing. Finally, some peace.`;
     } else {
-      responseText = `System event: ${eventDescription}. Greg is offline. ¯\\_(ツ)_/¯`;
+      responseText = `System event: ${eventDescription}. Mascot ${gregName} is offline. ¯\\_(ツ)_/¯`;
     }
   } else {
     try {
@@ -791,7 +805,7 @@ IMPORTANT: Keep it under 100 characters. Get straight to the point.
       });
       responseText = response.text || "";
     } catch (err) {
-      responseText = `Event recorded. Greg's subroutines are throttled. ¯\\_(ツ)_/¯`;
+      responseText = `Event recorded. Mascot ${gregName}'s subroutines are throttled. ¯\\_(ツ)_/¯`;
     }
   }
 
@@ -800,7 +814,7 @@ IMPORTANT: Keep it under 100 characters. Get straight to the point.
     
     inGameChats.push({
       id: `greg_event_${Date.now()}`,
-      sender: "Mascot_Greg",
+      sender: gregName,
       text: responseText,
       timestamp: new Date().toISOString()
     });
@@ -914,7 +928,8 @@ setInterval(async () => {
           
           if (itemSender === "InGamePlayer" || itemSender === "Pioneer") {
             const timeDiff = Math.abs(new Date(msg.timestamp).getTime() - new Date(parsedTime).getTime());
-            if (timeDiff < 20000 && (msg.sender === "User_Manager" || msg.sender === "Mascot_Greg")) {
+            const gregName = (serverState as any).gregName || "Mascot_Greg";
+            if (timeDiff < 20000 && (msg.sender === "User_Manager" || msg.sender === gregName || msg.sender === "Mascot_Greg")) {
               const cleanMsgText = msg.text.trim();
               const cleanItemText = itemText.trim();
               if (cleanMsgText === cleanItemText) return true;
@@ -944,7 +959,8 @@ setInterval(async () => {
           chatChanged = true;
           addLog("INFO", `LogChat: [${itemSender}]: ${itemText}`);
           
-          if (itemSender !== "Mascot_Greg" && itemSender !== "Greg" && itemSender !== "SERVER" && itemSender !== "System" && itemSender !== "InGamePlayer") {
+          const gregName = (serverState as any).gregName || "Mascot_Greg";
+          if (itemSender !== gregName && itemSender !== "Mascot_Greg" && itemSender !== "Greg" && itemSender !== "SERVER" && itemSender !== "System" && itemSender !== "InGamePlayer") {
             gregAutoReply(itemSender, itemText);
           }
         }
@@ -2462,7 +2478,7 @@ app.get("/api/telemetry", async (req, res) => {
 
   // Inject Mascot Greg as an active AI pioneer overlay
   players.push({
-    name: "Mascot_Greg",
+    name: (serverState as any).gregName || "Mascot_Greg",
     pingMs: 1, // Quantum ping
     health: 100,
     location: {
@@ -2559,7 +2575,7 @@ app.get("/api/docs/:id", (req, res) => {
 });
 
 app.post("/api/greg/config-key", requireAdmin, (req, res) => {
-  const { apiKey, model, personality, googleClientId } = req.body;
+  const { apiKey, model, personality, googleClientId, gregName, gregPrompt } = req.body;
   if (apiKey !== undefined) {
     (serverState as any).geminiApiKey = apiKey || "";
   }
@@ -2572,16 +2588,42 @@ app.post("/api/greg/config-key", requireAdmin, (req, res) => {
   if (googleClientId !== undefined) {
     (serverState as any).googleClientId = googleClientId || "";
   }
+  if (gregName !== undefined) {
+    (serverState as any).gregName = gregName.trim() || "Mascot_Greg";
+  }
+  if (gregPrompt !== undefined) {
+    (serverState as any).gregPrompt = gregPrompt || "";
+  }
   saveServerState();
   aiClient = null;
-  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Model: ${(serverState as any).geminiModel || "gemini-3.5-flash"}, Personality: ${(serverState as any).gregPersonality || "sarcastic"}. Resetting Greg AI client.`);
+  addLog("INFO", `LogDaemonForge: Updated dynamic Gemini API settings. Name: ${(serverState as any).gregName}, Model: ${(serverState as any).geminiModel || "gemini-3.5-flash"}, Personality: ${(serverState as any).gregPersonality || "sarcastic"}. Resetting Greg AI client.`);
   res.json({ 
     success: true, 
     hasGeminiKey: !!(process.env.GEMINI_API_KEY || (serverState as any).geminiApiKey || (serverState as any).useSubscriptionAI),
     geminiModel: (serverState as any).geminiModel,
     gregPersonality: (serverState as any).gregPersonality,
-    googleClientId: (serverState as any).googleClientId
+    googleClientId: (serverState as any).googleClientId,
+    gregName: (serverState as any).gregName,
+    gregPrompt: (serverState as any).gregPrompt
   });
+});
+
+app.post("/api/greg/generate-personality", requireAdmin, async (req, res) => {
+  const ai = getGemini();
+  if (!ai) {
+    return res.status(400).json({ error: "Gemini API key is not configured. Cannot generate personality." });
+  }
+  try {
+    const currentName = (serverState as any).gregName || "Mascot_Greg";
+    const response = await ai.models.generateContent({
+      model: serverState.geminiModel || "gemini-3.5-flash",
+      contents: [{ role: "user", parts: [{ text: `Generate a unique, funny, and highly creative roleplay personality description for a game server mascot AI named "${currentName}". It must be written in the second person (e.g. 'You are...'). Focus on unique traits, attitude, and how you view the players. Keep it under 80 words. Output ONLY the raw personality instructions, no wrapper text, quotes, or markdown.` }] }]
+    });
+    const generatedText = response.text?.trim() || "";
+    res.json({ success: true, prompt: generatedText });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/greg/google-login", requireAdmin, (req, res) => {

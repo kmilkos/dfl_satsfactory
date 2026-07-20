@@ -17,6 +17,8 @@ export interface ServerState {
   gregGooglePicture?: string;
   useSubscriptionAI?: boolean;
   googleClientId?: string;
+  gregName?: string;
+  gregPrompt?: string;
 }
 
 export interface Backup {

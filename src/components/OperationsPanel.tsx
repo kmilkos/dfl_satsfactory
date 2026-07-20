@@ -400,7 +400,7 @@ export default function OperationsPanel({
             {/* Speech Bubble / Text */}
             <div className="flex-1 text-left">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold tracking-wider text-orange-500 uppercase">Mascot_Greg (DaemonForge)</span>
+                <span className="text-[10px] font-mono font-bold tracking-wider text-orange-500 uppercase">{(serverInfo.gregName || "Mascot_Greg")} (DaemonForge)</span>
                 <button 
                   onClick={() => setShowRestartWarning(false)}
                   className="text-[9px] font-mono text-slate-500 hover:text-slate-300 transition-colors px-1.5 py-0.5 rounded border border-slate-800 hover:border-slate-700 cursor-pointer"

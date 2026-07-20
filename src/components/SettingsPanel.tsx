@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Settings, Shield, Database, Brain, Layout, Save, 
   RefreshCw, CheckCircle, AlertCircle, Info, ToggleLeft, ToggleRight,
-  Zap, Trash2, Wifi, FileText, Terminal, ExternalLink
+  Zap, Trash2, Wifi, FileText, Terminal, ExternalLink, Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ServerState } from "../types";
@@ -39,6 +39,9 @@ export default function SettingsPanel({
   const [googleClientId, setGoogleClientId] = useState(serverInfo.googleClientId || "");
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [isLoggingInGoogle, setIsLoggingInGoogle] = useState(false);
+  const [gregName, setGregName] = useState(serverInfo.gregName || "Mascot_Greg");
+  const [gregPrompt, setGregPrompt] = useState(serverInfo.gregPrompt || "");
+  const [isGeneratingPersonality, setIsGeneratingPersonality] = useState(false);
 
   // States for Password Change
   const [currentPassword, setCurrentPassword] = useState("");
@@ -75,6 +78,8 @@ export default function SettingsPanel({
     setGeminiModel(serverInfo.geminiModel || "gemini-3.5-flash");
     setGregPersonality(serverInfo.gregPersonality || "sarcastic");
     setGoogleClientId(serverInfo.googleClientId || "");
+    setGregName(serverInfo.gregName || "Mascot_Greg");
+    setGregPrompt(serverInfo.gregPrompt || "");
   }, [serverInfo]);
 
   // Load Google Identity Services SDK dynamically for live login
@@ -182,6 +187,29 @@ export default function SettingsPanel({
     }
   };
 
+  // Personality generator helper via Gemini backend
+  const handleGeneratePersonality = async () => {
+    setIsGeneratingPersonality(true);
+    triggerFeedback("greg", "loading", "Prompting Gemini to design a fresh roleplay personality...");
+    try {
+      const res = await fetchWithAuth("/api/greg/generate-personality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.success && data.prompt) {
+        setGregPrompt(data.prompt);
+        triggerFeedback("greg", "success", "Generated dynamic mascot personality matrix!");
+      } else {
+        throw new Error(data.error || "Failed to generate personality.");
+      }
+    } catch (err: any) {
+      triggerFeedback("greg", "error", err.message || "Personality generation failed.");
+    } finally {
+      setIsGeneratingPersonality(false);
+    }
+  };
+
   // 3. Save Gemini API Configuration (Model & Key)
   const handleSaveAIConfig = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -191,7 +219,9 @@ export default function SettingsPanel({
       const body: Record<string, string> = { 
         model: geminiModel,
         personality: gregPersonality,
-        googleClientId: googleClientId.trim()
+        googleClientId: googleClientId.trim(),
+        gregName: gregName.trim(),
+        gregPrompt: gregPrompt
       };
       if (apiKeyInput.trim()) {
         body.apiKey = apiKeyInput.trim();
@@ -631,6 +661,43 @@ export default function SettingsPanel({
                           <option value="military">Drill Sergeant (strict, loud commands)</option>
                           <option value="glados">Paranoid AI (condescending, GLaDOS-like)</option>
                         </select>
+                      </div>
+
+                      {/* Mascot Name Input */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-mono text-slate-500 uppercase font-bold">Mascot AI Name</label>
+                        <input
+                          type="text"
+                          placeholder="Enter Mascot Name... (e.g. Mascot_Greg)"
+                          value={gregName}
+                          onChange={(e) => setGregName(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-2.5 py-1.5 bg-zinc-900 border border-slate-800 rounded font-mono text-[10px] text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+
+                      {/* Mascot Instructions Prompt */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[9px] font-mono text-slate-500 uppercase font-bold">Mascot Custom Prompt Instructions</label>
+                          <button
+                            type="button"
+                            onClick={handleGeneratePersonality}
+                            disabled={isGeneratingPersonality || isSaving}
+                            className="text-[9px] font-mono text-orange-500 hover:text-orange-400 font-bold flex items-center bg-transparent border-none outline-none cursor-pointer transition-colors"
+                          >
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            GENERATE PERSONALITY
+                          </button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          placeholder="Enter custom instructions prompt for your Mascot..."
+                          value={gregPrompt}
+                          onChange={(e) => setGregPrompt(e.target.value)}
+                          disabled={isSaving}
+                          className="w-full px-2.5 py-1.5 bg-zinc-900 border border-slate-800 rounded font-mono text-[10px] text-slate-100 placeholder-slate-600 focus:outline-none focus:border-orange-500 resize-y"
+                        />
                       </div>
 
                       {/* Google Client ID Input */}

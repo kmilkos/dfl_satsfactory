@@ -13,6 +13,7 @@ interface GregAssistantProps {
   gregPersonality?: string;
   onRefreshStatus?: () => Promise<void>;
   isLoading: boolean;
+  gregName?: string;
 }
 
 export default function GregAssistant({ 
@@ -21,7 +22,8 @@ export default function GregAssistant({
   geminiModel,
   gregPersonality = "sarcastic",
   onRefreshStatus, 
-  isLoading: serverLoading 
+  isLoading: serverLoading,
+  gregName = "Mascot_Greg"
 }: GregAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -171,7 +173,7 @@ export default function GregAssistant({
                     }`}
                   >
                     <div className="flex justify-between items-center text-[10px] text-slate-500 mb-1 font-bold uppercase tracking-wider">
-                      <span>{isAssistant ? "Mascot_Greg (DaemonForge)" : "You (Manager)"}</span>
+                      <span>{isAssistant ? `${gregName} (DaemonForge)` : "You (Manager)"}</span>
                       {isAssistant && (
                         <span className="text-orange-500/70 font-semibold">[SYSADMIN]</span>
                       )}
